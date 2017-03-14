@@ -9,6 +9,8 @@ from cinp.server_common import Namespace, Model, Action, Paramater, Field
 
 __MODEL_REGISTRY__ = {}
 
+#TODO: take advantage of .save( update_fields=.... ) on UPDATE
+
 NEW_REMOTE_FIELD = int( django.get_version().split( '.' )[1] ) > 8  # last known (to me) use of related was 1.8
 
 def field_model_resolver( django_field ):
