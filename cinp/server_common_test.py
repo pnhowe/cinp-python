@@ -1,9 +1,9 @@
 import pytest
 
 from cinp.common import URI
-from cinp.server_common import __CINP_VERSION__, Converter, Paramater, Field, Element, Namespace, Model, Action, Request, Response, Server, InvalidRequest, ServerError, ObjectNotFound
+from cinp.server_common import __CINP_VERSION__, Converter, Paramater, Field, Namespace, Model, Action, Request, Response, Server, InvalidRequest, ServerError, ObjectNotFound
 
-#TODO: test CORS header stuff
+# TODO: test CORS header stuff
 
 
 def sort_dsc( describe ):
@@ -66,7 +66,7 @@ class TestTransaction():
     elif filter_name == 'bad':
       raise ValueError( 'bad stuff' )
 
-    return None # just to be explicit, None is the return value if you do not return anything
+    return None  # just to be explicit, None is the return value if you do not return anything
 
   def delete( self, model, object_id ):
     if object_id == 'NOT FOUND':
@@ -166,7 +166,7 @@ def test_namespace():
   assert ns.describe().header_map == { 'Cache-Control': 'max-age=0', 'Method': 'DESCRIBE', 'Type': 'Namespace' }
 
   assert ns.options().header_map == { 'Allow': 'OPTIONS, DESCRIBE', 'Cache-Control': 'max-age=0' }
-  assert ns.options().data == None
+  assert ns.options().data is None
 
 
 def test_field():
@@ -182,7 +182,7 @@ def test_field():
   assert converter.toPython( field, 'asdf', None ) == 'asdf'
   assert converter.toPython( field, 123, None ) == '123'
   assert converter.toPython( field, 3.21, None ) == '3.21'
-  assert converter.toPython( field, None, None ) == None
+  assert converter.toPython( field, None, None ) is None
   assert converter.fromPython( field, 333 ) == '333'
   assert converter.fromPython( field, 23.32 ) == '23.32'
   assert converter.fromPython( field, 'efe' ) == 'efe'
@@ -201,9 +201,9 @@ def test_field():
     converter.toPython( field, '23.4', None )
   with pytest.raises( ValueError ):
     converter.toPython( field, 'a', None )
-  assert converter.toPython( field, None, None ) == None
+  assert converter.toPython( field, None, None ) is None
   assert converter.toPython( field, 12, None ) == 12
-  assert converter.toPython( field, '32', None ) ==  32
+  assert converter.toPython( field, '32', None ) == 32
   with pytest.raises( ValueError ):
     converter.fromPython( field, '3.4' )
   with pytest.raises( ValueError ):
@@ -213,12 +213,12 @@ def test_field():
 
   field = Field( name='test3', type='Float' )
   assert converter.toPython( field, 12.5, None ) == 12.5
-  assert converter.toPython( field, '3.4', None ) ==  3.4
+  assert converter.toPython( field, '3.4', None ) == 3.4
   assert converter.toPython( field, '65', None ) == 65.0
-  assert converter.toPython( field, None, None ) == None
+  assert converter.toPython( field, None, None ) is None
   with pytest.raises( ValueError ):
     converter.toPython( field, 'ewq', None )
-  assert converter.fromPython( field, 5.2 ) ==  5.2
+  assert converter.fromPython( field, 5.2 ) == 5.2
   assert converter.fromPython( field, 87 ) == 87.0
   assert converter.fromPython( field, '4.5' ) == 4.5
   with pytest.raises( ValueError ):
@@ -227,7 +227,7 @@ def test_field():
     converter.fromPython( field, None )
 
   field = Field( name='test4', type='Boolean' )
-  #TODO: test boolean, datatime, map, model(includeing model_resolve er) and file
+  # TODO: test boolean, datatime, map, model(includeing model_resolve er) and file
 
 
 def test_model():
@@ -247,16 +247,16 @@ def test_model():
   model2 = Model( name='model2', transaction_class=TestTransaction, field_list=field_list )
   assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1' ], 'multi-uri-max': 100, 'doc': '' }
   assert sort_dsc( model1.describe().data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] }
-  assert sort_dsc( model2.describe().data ) == { 'name': 'model2', 'path': None, 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True,  }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( model2.describe().data ) == { 'name': 'model2', 'path': None, 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True, }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] }
   ns.addElement( model2 )
-  assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1','/api/model2' ], 'multi-uri-max': 100, 'doc': '' }
+  assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1', '/api/model2' ], 'multi-uri-max': 100, 'doc': '' }
   assert sort_dsc( model1.describe().data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] }
   assert sort_dsc( model2.describe().data ) == { 'name': 'model2', 'path': '/api/model2', 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] }
 
   assert model2.describe().header_map == { 'Cache-Control': 'max-age=0', 'Method': 'DESCRIBE', 'Type': 'Model' }
 
   assert model2.options().header_map == { 'Allow': 'OPTIONS, DESCRIBE, GET, LIST, CREATE, UPDATE, DELETE' }
-  assert model2.options().data == None
+  assert model2.options().data is None
 
 
 def test_action():
@@ -279,7 +279,7 @@ def test_action():
   assert action3.describe().header_map == { 'Cache-Control': 'max-age=0', 'Method': 'DESCRIBE', 'Type': 'Action' }
 
   assert action3.options().header_map == { 'Allow': 'OPTIONS, DESCRIBE, CALL' }
-  assert action3.options().data == None
+  assert action3.options().data is None
 
 
 def test_call():
@@ -290,24 +290,24 @@ def test_call():
   model = Model( name='model1', transaction_class=TestTransaction, field_list=field_list )
   transaction = model.transaction_class()
 
-  action1 = Action( name='act1', return_paramater=Paramater( type='String' ), func=lambda : 'hello' )
+  action1 = Action( name='act1', return_paramater=Paramater( type='String' ), func=lambda: 'hello' )
   resp = action1.call( converter, transaction, None, {}, False )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'CALL', 'Multi-Object': False }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'CALL', 'Multi-Object': 'False' }
   assert resp.data == 'hello'
 
   action2 = Action( name='act2', return_paramater=Paramater( type='String' ), paramater_list=[ Paramater( name='p1', type='String', default='alice' ) ], func=lambda p1: 'hello "{0}"'.format( p1 ) )
-  #with pytest.raises( InvalidRequest ):  # should we be ignorning data?
+  # with pytest.raises( InvalidRequest ):  # should we be ignorning data?
   #  resp = action2.call( converter, transaction, None, { 'p1': 'bob', 'nope': 'sue' }, False )
 
   resp = action2.call( converter, transaction, None, {}, False )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'CALL', 'Multi-Object': False }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'CALL', 'Multi-Object': 'False' }
   assert resp.data == 'hello "alice"'
 
   resp = action2.call( converter, transaction, None, { 'p1': 'bob' }, False )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'CALL', 'Multi-Object': False }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'CALL', 'Multi-Object': 'False' }
   assert resp.data == 'hello "bob"'
 
   action3 = Action( name='act3', return_paramater=Paramater( type='String' ), func=lambda a: 'hello "{0}"'.format( a ), static=False )
@@ -317,7 +317,7 @@ def test_call():
 
   resp = action3.call( converter, transaction, [ 'sue' ], {}, False )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'CALL', 'Multi-Object': False }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'CALL', 'Multi-Object': 'False' }
   assert resp.data == 'hello "{\'_extra_\': \'get "sue"\'}"'
 
   with pytest.raises( ObjectNotFound ):
@@ -326,9 +326,8 @@ def test_call():
   action4 = Action( name='act4', func=lambda: 'hello' )
   resp = action4.call( converter, transaction, [], {}, False )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'CALL', 'Multi-Object': False }
-  assert resp.data == None
-
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'CALL', 'Multi-Object': 'False' }
+  assert resp.data is None
 
 
 def test_create():
@@ -412,31 +411,31 @@ def test_get():
 
   resp = model.get( converter, transaction, [ 'bob' ], False )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'GET', 'Multi-Object': False }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'GET', 'Multi-Object': 'False' }
   assert resp.data == { '_extra_': 'get "bob"' }
 
   resp = model.get( converter, transaction, [ 'bob' ], True )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'GET', 'Multi-Object': True }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'GET', 'Multi-Object': 'True' }
   assert resp.data == { 'None:bob:': { '_extra_': 'get "bob"' } }
 
   resp = model.get( converter, transaction, [ 'bob', 'martha', 'sue' ], True )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'GET', 'Multi-Object': True }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'GET', 'Multi-Object': 'True' }
   assert resp.data == { 'None:bob:': { '_extra_': 'get "bob"' }, 'None:martha:': { '_extra_': 'get "martha"' }, 'None:sue:': { '_extra_': 'get "sue"' } }
 
   resp = model.get( converter, transaction, [ 'bob', 'martha', 'sue' ], False )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'GET', 'Multi-Object': False }
-  assert resp.data == { '_extra_': 'get "bob"' } #this is right, if multi is false, we ignore the rest of the ids, upstream takes care of making sure that dosen't happen
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'GET', 'Multi-Object': 'False' }
+  assert resp.data == { '_extra_': 'get "bob"' }  # this is right, if multi is false, we ignore the rest of the ids, upstream takes care of making sure that dosen't happen
 
   with pytest.raises( ObjectNotFound ):
     model.get( converter, transaction, [ 'bob', 'NOT FOUND', 'sue' ], True )
 
   model.get( converter, transaction, [ 'bob', 'NOT FOUND', 'sue' ], False )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'GET', 'Multi-Object': False }
-  assert resp.data == { '_extra_': 'get "bob"' } # see above
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'GET', 'Multi-Object': 'False' }
+  assert resp.data == { '_extra_': 'get "bob"' }  # see above
 
   with pytest.raises( ObjectNotFound ):
     model.get( converter, transaction, [ 'NOT FOUND' ], False )
@@ -455,12 +454,12 @@ def test_update():
 
   resp = model.update( converter, transaction, [ 'bob' ], {}, False )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'UPDATE', 'Multi-Object': False }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'UPDATE', 'Multi-Object': 'False' }
   assert resp.data == { '_extra_': 'update "bob"' }
 
   resp = model.update( converter, transaction, [ 'bob' ], { 'field1': 'goodies' }, False )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'UPDATE', 'Multi-Object': False }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'UPDATE', 'Multi-Object': 'False' }
   assert resp.data == { '_extra_': 'update "bob"', 'field1': 'goodies' }
 
   with pytest.raises( InvalidRequest ):
@@ -474,17 +473,17 @@ def test_update():
 
   resp = model.update( converter, transaction, [ 'bob', 'martha', 'sue' ], { 'field1': 'goodies' }, False )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'UPDATE', 'Multi-Object': False }
-  assert resp.data == { '_extra_': 'update "bob"', 'field1': 'goodies' } #this is right, if multi is false, we ignore the rest of the ids, upstream takes care of making sure that dosen't happen
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'UPDATE', 'Multi-Object': 'False' }
+  assert resp.data == { '_extra_': 'update "bob"', 'field1': 'goodies' }  # this is right, if multi is false, we ignore the rest of the ids, upstream takes care of making sure that dosen't happen
 
   resp = model.update( converter, transaction, [ 'bob' ], { 'field1': 'goodies' }, True )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'UPDATE', 'Multi-Object': True }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'UPDATE', 'Multi-Object': 'True' }
   assert resp.data == { 'None:bob:': { '_extra_': 'update "bob"', 'field1': 'goodies' } }
 
   resp = model.update( converter, transaction, [ 'bob', 'martha', 'sue' ], { 'field1': 'goodies' }, True )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'UPDATE', 'Multi-Object': True }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'UPDATE', 'Multi-Object': 'True' }
   assert resp.data == { 'None:bob:': { '_extra_': 'update "bob"', 'field1': 'goodies' }, 'None:martha:': { '_extra_': 'update "martha"', 'field1': 'goodies' }, 'None:sue:': { '_extra_': 'update "sue"', 'field1': 'goodies' } }
 
 
@@ -496,12 +495,12 @@ def test_delete():
   resp = model.delete( transaction, [ 'bob' ] )
   assert resp.http_code == 200
   assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'DELETE' }
-  assert resp.data == None
+  assert resp.data is None
 
   resp = model.delete( transaction, [ 'bob', 'sue', 'martha' ] )
   assert resp.http_code == 200
   assert resp.header_map == { 'Cache-Control': 'no-cache', 'Method': 'DELETE' }
-  assert resp.data == None
+  assert resp.data is None
 
   with pytest.raises( ObjectNotFound ):
     model.delete( transaction, [ 'bob', 'NOT FOUND', 'martha' ] )
@@ -523,7 +522,7 @@ def test_getElement():
   mdl2 = Model( name='mdl2', field_list={}, transaction_class=TestTransaction )
   root_ns.addElement( mdl1 )
   ns2_2.addElement( mdl2 )
-  act1 = Action( name='act1', return_paramater=Paramater( type='String' ), paramater_list=[ Paramater( name='bob', type='Float' ) ], static=False , func=fake_func)
+  act1 = Action( name='act1', return_paramater=Paramater( type='String' ), paramater_list=[ Paramater( name='bob', type='Float' ) ], static=False, func=fake_func )
   act2 = Action( name='act2', return_paramater=Paramater( type='String' ), paramater_list=[ Paramater( name='stuff', type='Boolean' ) ], func=fake_func )
   mdl1.addAction( act1 )
   mdl2.addAction( act2 )
@@ -548,16 +547,16 @@ def test_getElement():
   with pytest.raises( ValueError ):
     root_ns.getElement( '/api/' )
 
-  assert root_ns.getElement( uri.split( '/api/nsX/' ) ) ==  None
-  assert root_ns.getElement( uri.split( '/api/ns2/mdlX' ) ) ==  None
-  assert root_ns.getElement( uri.split( '/api/mdl1(actX)' ) ) ==  None
+  assert root_ns.getElement( uri.split( '/api/nsX/' ) ) is None
+  assert root_ns.getElement( uri.split( '/api/ns2/mdlX' ) ) is None
+  assert root_ns.getElement( uri.split( '/api/mdl1(actX)' ) ) is None
 
 
 def test_request():
-  req = Request( 'DESCRIBE', '/api/v1/ns/model', { 'CINP-VERSION': '0.9', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'stuff', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50, 'MULTI-OBJECT': True } )
+  req = Request( 'DESCRIBE', '/api/v1/ns/model', { 'CINP-VERSION': '0.9', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'stuff', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50, 'Multi-Object': 'True' } )
   assert req.method == 'DESCRIBE'
   assert req.uri == '/api/v1/ns/model'
-  assert req.header_map == { 'CINP-VERSION': '0.9', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'stuff', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50, 'MULTI-OBJECT': True }
+  assert req.header_map == { 'CINP-VERSION': '0.9', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'stuff', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50 }
 
   req = Request( 'GET', '/api/v2/model:key:', { 'CINP-VERSION': '0.9', 'USER-AGENT': 'mybrowser' } )
   assert req.method == 'GET'
@@ -571,7 +570,7 @@ def test_request():
   assert req.data == { 'key': 'value' }
 
   req.fromJSON( '' )
-  assert req.data == None
+  assert req.data is None
 
   req.fromJSON( '[ 1 ,2 ,3 ]' )
   assert req.data == [ 1, 2, 3 ]
@@ -580,21 +579,21 @@ def test_request():
 def test_response():
   resp = Response( 200 )
   assert resp.http_code == 200
-  assert resp.data == None
+  assert resp.data is None
   assert resp.header_map == {}
-  assert resp.asJSON() == None
+  assert resp.asJSON() is None
 
   resp = Response( 201, { 'hi': 'there' } )
   assert resp.http_code == 201
   assert resp.data == { 'hi': 'there' }
   assert resp.header_map == {}
-  assert resp.asJSON() == None # yea, still none, base Responose dosen't asXXXX anything
+  assert resp.asJSON() is None  # yea, still none, base Responose dosen't asXXXX anything
 
   resp = Response( 201, 'more stuff', { 'hdr': 'big' } )
   assert resp.http_code == 201
   assert resp.data == 'more stuff'
   assert resp.header_map == { 'hdr': 'big' }
-  assert resp.asJSON() == None # yea, still none, base Responose dosen't asXXXX anything
+  assert resp.asJSON() is None  # yea, still none, base Responose dosen't asXXXX anything
 
 
 def test_server():
@@ -656,7 +655,7 @@ def test_server():
   assert sort_dsc( res.data ) == desc_ref
   assert res.header_map == { 'Type': 'Model', 'Method': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '0.9' }
 
-  #TODO: more more more
+  # TODO: more more more
 
 
 def test_multi():
@@ -668,35 +667,36 @@ def test_multi():
   ns1.addElement( model1 )
   server.registerNamespace( '/', ns1 )
 
-  req =  Request( 'GET', '/api/ns1/model1:abc:', { 'CINP-VERSION': __CINP_VERSION__ } )
+  req = Request( 'GET', '/api/ns1/model1:abc:', { 'CINP-VERSION': __CINP_VERSION__ } )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Method': 'GET', 'Multi-Object': False }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Method': 'GET', 'Multi-Object': 'False' }
   assert res.data == { '_extra_': 'get "abc"' }
 
-  req =  Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__ } )
+  req = Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__ } )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Method': 'GET', 'Multi-Object': True }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Method': 'GET', 'Multi-Object': 'True' }
   assert res.data == { '/api/ns1/model1:abc:': { '_extra_': 'get "abc"' }, '/api/ns1/model1:def:': { '_extra_': 'get "def"' } }
 
-  req =  Request( 'GET', '/api/ns1/model1:abc:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'true' } )
+  req = Request( 'GET', '/api/ns1/model1:abc:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'true' } )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Method': 'GET', 'Multi-Object': True }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Method': 'GET', 'Multi-Object': 'True' }
   assert res.data == { '/api/ns1/model1:abc:': { '_extra_': 'get "abc"' } }
 
-  req =  Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'true' } )
+  req = Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'true' } )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Method': 'GET', 'Multi-Object': True }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Method': 'GET', 'Multi-Object': 'True' }
   assert res.data == { '/api/ns1/model1:abc:': { '_extra_': 'get "abc"' }, '/api/ns1/model1:def:': { '_extra_': 'get "def"' } }
 
-  req =  Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'false' } )
+  req = Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'false' } )
   res = server.handle( req )
   assert res.http_code == 400
   assert res.header_map == { 'Cinp-Version': '0.9' }
   assert res.data == { 'message': 'requested non multi-object, however multiple ids where sent' }
+
 
 def test_not_allowed_methods():
   server = Server( root_path='/api/', root_version='0.0', debug=True )
@@ -791,6 +791,7 @@ def test_not_allowed_methods():
   req = Request( 'CALL', '/api/ns1/model2(act)', { 'CINP-VERSION': __CINP_VERSION__ } )
   res = server.handle( req )
   assert res.http_code == 403
+
 
 def test_user():
   server = Server( root_path='/api/', root_version='0.0', debug=True )

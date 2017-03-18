@@ -1,10 +1,10 @@
 import pytest
-from urllib import request
 
-from cinp.client import CInP, Timeout, ResponseError, InvalidRequest, InvalidSession, NotAuthorized, NotFound, ServerError
+from cinp.client import CInP, ResponseError, InvalidRequest, InvalidSession, NotAuthorized, NotFound, ServerError
 
-#TODO: test timeout value  passthrough
-#TODO: test setting proxy, also make sure the envrionment proxy settings are handdled correctly
+# TODO: test timeout value  passthrough
+# TODO: test setting proxy, also make sure the envrionment proxy settings are handdled correctly
+
 
 class MockResponse():
   def __init__( self, code, header_map, data ):
@@ -21,26 +21,26 @@ class MockResponse():
 
 
 def test_constructor():
-  CInP( '/api/v1/', 'http://localhost', 8080, None )
+  CInP( 'http://localhost', '/api/v1/', 8080, None )
 
   with pytest.raises( ValueError ):
-    CInP( '/api/v1/', 'localhost', 8080, None )
+    CInP( 'localhost', '/api/v1/', 8080, None )
 
   with pytest.raises( ValueError ):
-    CInP( '/api/v1', 'http://localhost', 8080, None )
+    CInP( 'http://localhost', '/api/v1', 8080, None )
 
   with pytest.raises( ValueError ):
-    CInP( 'api/v1', 'http://localhost', 8080, None )
+    CInP( 'http://localhost', 'api/v1', 8080, None )
 
   with pytest.raises( ValueError ):
-    CInP( 'api/v1/', 'http://localhost', 8080, None )
+    CInP( 'http://localhost', 'api/v1/', 8080, None )
 
   with pytest.raises( ValueError ):
-    CInP( '/api/v1/', 'http://localhost/', 8080, None )
+    CInP( 'http://localhost/', '/api/v1/', 8080, None )
 
 
 def test_checkRequest():
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
 
   # describe
   with pytest.raises( InvalidRequest ):
@@ -89,7 +89,7 @@ def test_checkRequest():
     cinp._checkRequest( 'GET', '/api/v1/model(sdf)', None )
 
   with pytest.raises( InvalidRequest ):
-    cinp._checkRequest( 'GET', '/api/v1/model:ad:', {'sdf':'sdf'} )
+    cinp._checkRequest( 'GET', '/api/v1/model:ad:', {'sdf': 'sdf'} )
 
   # create
   cinp._checkRequest( 'CREATE', '/api/v1/model', { 'asdf': 'asdf' } )
@@ -301,7 +301,7 @@ def test_checkRequest():
 
 
 def test_request( mocker ):
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '' )
 
@@ -316,7 +316,7 @@ def test_request( mocker ):
   assert req.headers == {}
   assert req.get_method() == 'GET'
   assert code == 200
-  assert data == None
+  assert data is None
   assert header_map == {}
 
   mocked_open.reset_mock()
@@ -327,7 +327,7 @@ def test_request( mocker ):
   assert req.headers == {}
   assert req.get_method() == 'UPDATE'
   assert code == 200
-  assert data == None
+  assert data is None
   assert header_map == {}
 
   mocked_open.reset_mock()
@@ -338,7 +338,7 @@ def test_request( mocker ):
   assert req.headers == { 'Pos': 123 }
   assert req.get_method() == 'LIST'
   assert code == 200
-  assert data == None
+  assert data is None
   assert header_map == {}
 
   mocked_open.reset_mock()
@@ -407,7 +407,7 @@ def test_request( mocker ):
   assert req.headers == {}
   assert req.get_method() == 'GET'
   assert code == 200
-  assert data == None
+  assert data is None
   assert header_map == { "Type": "model" }
 
   mocked_open.reset_mock()
@@ -419,10 +419,10 @@ def test_request( mocker ):
   assert req.headers == {}
   assert req.get_method() == 'GET'
   assert code == 200
-  assert data == None
+  assert data is None
   assert header_map == {}
 
-  cinp = CInP( '/theapi/', 'http://bob.com', 70, 'http://proxy:3128/' )
+  cinp = CInP( 'http://bob.com', '/theapi/', 70, 'http://proxy:3128/' )
   mocked_open.reset_mock()
   mocked_open.return_value = MockResponse( 200, {}, '' )
   ( code, data, header_map ) = cinp._request( 'GET', '/theapi/model:123:' )
@@ -432,11 +432,12 @@ def test_request( mocker ):
   assert req.headers == {}
   assert req.get_method() == 'GET'
   assert code == 200
-  assert data == None
+  assert data is None
   assert header_map == {}
 
+
 def test_get( mocker ):
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '{"key": "value", "thing": "stuff"}' )
 
@@ -480,8 +481,9 @@ def test_get( mocker ):
   assert req.get_method() == 'GET'
   assert rec_values == { 'key': 'value', 'thing': 'stuff' }
 
+
 def test_list( mocker ):
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, { 'Position': '0', 'Count': '2', 'Total': '20' }, '["/api/v1/model:123:","/api/v1/model:124:"]' )
 
@@ -575,7 +577,7 @@ def test_list( mocker ):
 
 
 def test_create( mocker ):
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 201, { 'Object-Id': 'test' }, '{"asdf": "erere"}' )
 
@@ -622,7 +624,7 @@ def test_create( mocker ):
 
 
 def test_update( mocker ):
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '{"hi": "there"}' )
 
@@ -675,7 +677,7 @@ def test_update( mocker ):
 
 
 def test_delete( mocker ):
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '{}' )
 
@@ -692,7 +694,7 @@ def test_delete( mocker ):
   assert req.data == b''
   assert req.headers == {}
   assert req.get_method() == 'DELETE'
-  assert result == True
+  assert result is True
 
   mocked_open.reset_mock()
   result = cinp.delete( '/api/v1/model:123:asdf:' )
@@ -701,7 +703,7 @@ def test_delete( mocker ):
   assert req.data == b''
   assert req.headers == {}
   assert req.get_method() == 'DELETE'
-  assert result == True
+  assert result is True
 
   mocked_open.reset_mock()
   mocked_open.return_value = MockResponse( 201, {}, '{}' )
@@ -715,7 +717,7 @@ def test_delete( mocker ):
 
 
 def test_call( mocker ):
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '{}' )
 
@@ -799,7 +801,7 @@ def test_call( mocker ):
 
 
 def test_describe( mocker ):
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '' )
 
@@ -813,7 +815,7 @@ def test_describe( mocker ):
   assert req.data == b''
   assert req.headers == {}
   assert req.get_method() == 'DESCRIBE'
-  assert data == None
+  assert data is None
 
   mocked_open.reset_mock()
   data = cinp.describe( '/api/v1/model' )
@@ -822,7 +824,7 @@ def test_describe( mocker ):
   assert req.data == b''
   assert req.headers == {}
   assert req.get_method() == 'DESCRIBE'
-  assert data == None
+  assert data is None
 
   mocked_open.reset_mock()
   data = cinp.describe( '/api/v1/model(sdf)' )
@@ -831,26 +833,28 @@ def test_describe( mocker ):
   assert req.data == b''
   assert req.headers == {}
   assert req.get_method() == 'DESCRIBE'
-  assert data == None
+  assert data is None
 
   mocked_open.reset_mock()
   mocked_open.return_value = MockResponse( 201, {}, '' )
   with pytest.raises( ResponseError ):
     cinp.describe( '/api/v1/model' )
 
+
 def test_setauth():
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
   cinp.setAuth( 'user', 'token' )
   cinp.setAuth()
 
+
 def test_get_multi( mocker ):
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '{"/api/v1/ns/model:asd:":{"key1":"value1"},"/api/v1/ns/model:efe:":{"key2":"value2"}}' )
 
   mocked_open.reset_mock()
   gen = cinp.getMulti( '/api/v1/ns/model:asd:efe:' )
-  assert mocked_open.call_args == None
+  assert mocked_open.call_args is None
   assert sorted( list( gen ) ) == sorted( [ ( '/api/v1/ns/model:asd:', { 'key1': 'value1' } ), ( '/api/v1/ns/model:efe:', { 'key2': 'value2' } ) ] )
   assert mocked_open.call_count == 1
   req = mocked_open.call_args[0][0]
@@ -861,7 +865,7 @@ def test_get_multi( mocker ):
 
   mocked_open.reset_mock()
   gen = cinp.getMulti( '/api/v1/ns/model', [ 'asd', 'efe' ] )
-  assert mocked_open.call_args == None
+  assert mocked_open.call_args is None
   assert sorted( list( gen ) ) == sorted( [ ( '/api/v1/ns/model:asd:', { 'key1': 'value1' } ), ( '/api/v1/ns/model:efe:', { 'key2': 'value2' } ) ] )
   assert mocked_open.call_count == 1
   req = mocked_open.call_args[0][0]
@@ -872,7 +876,7 @@ def test_get_multi( mocker ):
 
   mocked_open.reset_mock()
   gen = cinp.getMulti( '/api/v1/ns/model:123:', [ 'asd', 'efe' ] )
-  assert mocked_open.call_args == None
+  assert mocked_open.call_args is None
   assert sorted( list( gen ) ) == sorted( [ ( '/api/v1/ns/model:asd:', { 'key1': 'value1' } ), ( '/api/v1/ns/model:efe:', { 'key2': 'value2' } ) ] )
   assert mocked_open.call_count == 1
   req = mocked_open.call_args[0][0]
@@ -883,7 +887,7 @@ def test_get_multi( mocker ):
 
   mocked_open.reset_mock()
   gen = cinp.getMulti( '/api/v1/ns/model', [ 'asd', 'efe', 'qwe', '123' ], chunk_size=2 )
-  assert mocked_open.call_args == None
+  assert mocked_open.call_args is None
   assert sorted( list( gen ) ) == sorted( [ ( '/api/v1/ns/model:asd:', { 'key1': 'value1' } ), ( '/api/v1/ns/model:efe:', { 'key2': 'value2' } ), ( '/api/v1/ns/model:asd:', { 'key1': 'value1' } ), ( '/api/v1/ns/model:efe:', { 'key2': 'value2' } ) ] )
   assert mocked_open.call_count == 2
   req = mocked_open.call_args_list[0][0][0]
@@ -897,8 +901,9 @@ def test_get_multi( mocker ):
   assert req.headers == { 'Multi-object': True }
   assert req.get_method() == 'GET'
 
+
 def test_get_filtered_objects( mocker ):
-  cinp = CInP( '/api/v1/', 'http://localhost', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, { 'Position': 0, 'Count': 2, 'Total': 2 }, '["/api/v1/ns/model:asd:","/api/v1/ns/model:efe:"]' )
 
@@ -918,4 +923,5 @@ def test_get_filtered_objects( mocker ):
   assert req.headers == { 'Multi-object': True }
   assert req.get_method() == 'GET'
 
-  #TODO: figure how to test and then test having multiple LIST calls, will probably take a smarter MockResponse class
+
+# TODO: figure how to test and then test having multiple LIST calls, will probably take a smarter MockResponse class
