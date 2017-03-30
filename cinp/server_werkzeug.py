@@ -23,7 +23,7 @@ class WerkzeugServer( Server ):
 
         return werkzeug.wrappers.BaseResponse( response=message, status=500, content_type='text/plain' )
 
-      return WerkzeugResponse( response ).asJSON() # server_common needs to tell us somehow what asXXXX to use
+      return WerkzeugResponse( response ).buildNativeResponse()
 
     except Exception as e:
       logging.error( 'Top level Exception, "{0}"({1})'.format( str( e ), type( e ).__name__ ) )
@@ -62,20 +62,33 @@ class WerkzeugRequest( Request ):
 
     super().__init__( method=werkzeug_request.method.upper(), uri=werkzeug_request.path, header_map=header_map, *args, **kwargs )
 
-    self.fromJSON( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) ) # hopfully the request isn't larger than 160k, if so, we may need to rethink things
+    self.fromJSON( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) )  # hopfully the request isn't larger than 160k, if so, we may need to rethink things
+
+    self.remote_addr = werkzeug_request.remote_addr
+    self.is_secure = werkzeug_request.is_secure
     werkzeug_request.close()
 
 
-class WerkzeugResponse():
+class WerkzeugResponse():  # TODO: this should be a subclass of the server_common Response, to much redundant stuff
   def __init__( self, response ):
     if not isinstance( response, Response ):
       raise ValueError( 'response must be of type Response' )
+
     super().__init__()
+    self.content_type = response.content_type
     self.data = response.data
     self.status = response.http_code
     self.header_list = []
     for name in response.header_map:
-      self.header_list.append(( name, response.header_map[ name ] ) )
+      self.header_list.append( ( name, response.header_map[ name ] ) )
+
+  def buildNativeResponse( self ):
+    if self.content_type == 'json':
+      return self.asJSON()
+    elif self.content_type == 'xml':
+      return self.asXML()
+
+    return self.asText()
 
   def asText( self ):
     return werkzeug.wrappers.BaseResponse( response=self.data, status=self.status, headers=self.header_list, content_type='text/plain;charset=utf-8' )

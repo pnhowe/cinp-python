@@ -10,6 +10,7 @@ __MULTI_URI_MAX__ = 100
 
 FIELD_TYPE_LIST = ( 'String', 'Integer', 'Float', 'Boolean', 'DateTime', 'Map', 'Model', 'File' )
 
+
 class InvalidRequest( Exception ):
   def __init__( self, message=None, data=None):
     self.data = data or { 'message': message } or 'Unknown'
@@ -28,7 +29,7 @@ class ServerError( Exception ):
   def asResponse( self ):
     return Response( 500, data={ 'message': self.message } )
 
-  def  __str__( self ):
+  def __str__( self ):
     return 'ServerError: "{0}"'.format( self.message )
 
 
@@ -57,19 +58,21 @@ class AnonymouseUser():
   def isAnonymouse( self ):
     return True
 
+
 def _dictConverter( value ):
   _fromPythonMap( value )
   return value
 
 MAP_TYPE_CONVERTER = {
-    'NoneType': lambda a: None,
-    'str': str,
-    'int': str,
-    'float': str,
-    'datetime': lambda a: a.isoformat(),
-    'timedelta': lambda a: a.total_seconds(),
-    'dict': _dictConverter
-  }
+                       'NoneType': lambda a: None,
+                       'str': str,
+                       'int': str,
+                       'float': str,
+                       'datetime': lambda a: a.isoformat(),
+                       'timedelta': lambda a: a.total_seconds(),
+                       'dict': _dictConverter
+                     }
+
 
 def _fromPythonMap_converter( value ):
   try:
@@ -77,9 +80,10 @@ def _fromPythonMap_converter( value ):
   except KeyError:
     raise ValueError( 'no converter for type "{0}" in map converter'.format( type( value ).__name__ ) )
 
+
 def _fromPythonMap( value ):
   for key in value.keys():
-    if isinstance( value[ key ], tuple ): # convert tuple to list before iterating
+    if isinstance( value[ key ], tuple ):  # convert tuple to list before iterating
       value[ key ] = list( value[ key ] )
 
     if isinstance( value[ key ], dict ):
@@ -91,6 +95,7 @@ def _fromPythonMap( value ):
 
     else:
       value[ key ] = _fromPythonMap_converter( value[ key ] )
+
 
 class Converter():
   def __init__( self, uri ):
@@ -169,7 +174,7 @@ class Converter():
       if self.uri.build( path, model ) != paramater.model.path:
         raise ValueError( 'Object "{0}" is for a model other than "{1}"'.format( cinp_value, paramater.model.path )  )
 
-      result = transaction.get( paramater.model, id_list[0] ) #TODO: handle multi id id_lists  right
+      result = transaction.get( paramater.model, id_list[0] )   # TODO: handle multi id id_lists  right
       if result is None:
         raise ValueError( 'Object "{0}" for model "{1}" NotFound'.format( cinp_value, paramater.model.path ) )
 
@@ -235,7 +240,6 @@ class Converter():
 
     raise Exception( 'Unknown type "{0}"'.format( self.type ) )
 
-
   def toPython( self, paramater, cinp_value, transaction ):
     if paramater.type is None:
       return None
@@ -263,7 +267,7 @@ class Converter():
     if paramater.is_array:
       result = []
       if paramater.type == 'Model':
-        python_value = list( python_value.all() ) # django specific again, and really should only get the pk
+        python_value = list( python_value.all() )  # django specific again, and really should only get the pk
 
       if not isinstance( python_value, list ):
         raise ValueError( 'Must be an Array/List, got "{0}"'.format( type( python_value ).__name__ ) )
@@ -395,8 +399,9 @@ class Element():
   def checkAuth( user, method, id_list ):
     raise ValueError( 'checkAuth not implemented' )
 
+
 class Namespace( Element ):
-  def __init__( self, name, version, root_path=None, *args, **kwargs ): # set name and parent to None for a root node
+  def __init__( self, name, version, root_path=None, *args, **kwargs ):  # set name and parent to None for a root node
     if name == 'root':
       raise ValueError( 'namespace name "root" is reserved' )
 
@@ -423,7 +428,7 @@ class Namespace( Element ):
     return '{0}{1}/'.format( self.parent.path, self.name )
 
   def getElement( self, path ):
-    if isinstance( path, tuple ) and self.name == 'root': # tuple is ( path, model, action .... )
+    if isinstance( path, tuple ) and self.name == 'root':  # tuple is ( path, model, action .... )
       new_path = path[0]
       if path[1] is not None:
         new_path.append( path[1] )
@@ -487,7 +492,7 @@ class Model( Element ):
       self.field_map[ field.name ] = field
 
     self.action_map = {}
-    self.list_filter_map = list_filter_map or {} #TODO: check list_filter_map  for  saninty, should  be [ filter_name ][ paramater_name ] = Paramater
+    self.list_filter_map = list_filter_map or {}  # TODO: check list_filter_map  for  saninty, should  be [ filter_name ][ paramater_name ] = Paramater
     self.constant_list = constant_list or []
     self.not_allowed_method_list = []
     for method in not_allowed_method_list or []:
@@ -496,7 +501,6 @@ class Model( Element ):
       if method not in ( 'GET', 'LIST', 'CALL', 'CREATE', 'UPDATE', 'DELETE', 'DESCRIBE' ):
         raise ValueError( 'Invalid blocked Method "{0}"'.format( method ) )
       self.not_allowed_method_list.append( method )
-
 
   @property
   def path( self ):
@@ -542,7 +546,7 @@ class Model( Element ):
 
     return Response( 200, data=None, header_map=header_map )
 
-  def _asDict( self, converter, target_object ): # yes this is a bit of a hack, would be best if the transaction did this.  This iteration is really for django with a unittest pass through
+  def _asDict( self, converter, target_object ):  # yes this is a bit of a hack, would be best if the transaction did this.  This iteration is really for django with a unittest pass through
     if target_object is None:
       return None
 
@@ -556,7 +560,7 @@ class Model( Element ):
       except ValueError as e:
         raise ValueError( 'Error with "{0}": "{1}"'.format( field_name, str( e ) ) )
       except AttributeError:
-        raise ServerError( 'taret_object missing field "{0}"'.format( field_name ) ) # yes, internal server error, target_object comes from inside the house
+        raise ServerError( 'taret_object missing field "{0}"'.format( field_name ) )  # yes, internal server error, target_object comes from inside the house
 
     return result
 
@@ -626,7 +630,7 @@ class Model( Element ):
     value_map = {}
     update_value_map = {}
     error_map = {}
-    for field_name in data: # first make sure the fields are ok to look at
+    for field_name in data:  # first make sure the fields are ok to look at
       try:
         field = self.field_map[ field_name ]
       except KeyError:
@@ -636,7 +640,7 @@ class Model( Element ):
       if field.mode not in ( 'RW', 'RC' ):
         error_map[ field_name ] = 'Not Writeable'
 
-    for field_name in self.field_map: # now let's import the values
+    for field_name in self.field_map:  # now let's import the values
       field = self.field_map[ field_name ]
       if field.mode not in ( 'RW', 'RC' ):
         continue
@@ -664,7 +668,6 @@ class Model( Element ):
         raise InvalidRequest( data=e.args[0] )
       else:
         raise InvalidRequest( str( e ) )
-
 
     if not isinstance( result, tuple ) and len( result ) != 2:
       raise ServerError( 'Create result is not a valid tuple' )
@@ -708,7 +711,7 @@ class Model( Element ):
 
     value_map = {}
     error_map = {}
-    for field_name in data: # first make sure the fields are ok to look at
+    for field_name in data:  # first make sure the fields are ok to look at
       try:
         field = self.field_map[ field_name ]
       except KeyError:
@@ -718,7 +721,7 @@ class Model( Element ):
       if field.mode != 'RW':
         error_map[ field_name ] = 'Not Writeable'
 
-    for field_name in self.field_map: # now let's import the values
+    for field_name in self.field_map:  # now let's import the values
       field = self.field_map[ field_name ]
       if field.mode != 'RW':
         continue
@@ -791,7 +794,7 @@ class Action( Element ):
   def call( self, converter, transaction, id_list, data, multi ):
     error_map = {}
     value_map = {}
-    for paramater_name in self.paramater_map: # should we be ignorning data?
+    for paramater_name in self.paramater_map:  # should we be ignorning data?
       paramater = self.paramater_map[ paramater_name ]
       try:
         value_map[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
@@ -844,6 +847,7 @@ class Server():
     self.root_namespace = Namespace( name=None, version=root_version, root_path=root_path )
     self.root_namespace.checkAuth = lambda user, method, id_list: True
     self.cors_allow_list = cors_allow_list
+    self.path_handlers = {}
 
   def getUser( self, auth_id, auth_token ):
     raise ValueError( 'getUser not implemented' )
@@ -852,10 +856,10 @@ class Server():
     for field_name in model.field_map:
       field = model.field_map[ field_name ]
       if field.type == 'Model' and hasattr( field, 'model_resolve' ):
-        ( mode, is_array, new_model ) = field.model_resolve( field.model ) # this is django specific again
+        ( mode, is_array, new_model ) = field.model_resolve( field.model )  # this is django specific again
         del field.model_resolve
         if not isinstance( new_model, Model ):
-          raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( item, field.model ) )
+          raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
 
         if mode is not None:
           field.mode = mode
@@ -870,10 +874,10 @@ class Server():
         for paramater_name in paramater_map:
           paramater = paramater_map[ paramater_name ]
           if paramater.type == 'Model' and hasattr( paramater, 'model_resolve' ):
-            ( _, _, new_model ) = paramater.model_resolve( paramater.model ) # this is django specific again
+            ( _, _, new_model ) = paramater.model_resolve( paramater.model )  # this is django specific again
             del paramater.model_resolve
             if not isinstance( new_model, Model ):
-              raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( item, field.model ) )
+              raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
 
             paramater.model = new_model
 
@@ -882,14 +886,12 @@ class Server():
         for paramater_name in paramater_map:
           paramater = paramater_map[ paramater_name ]
           if paramater.type == 'Model' and hasattr( paramater, 'model_resolve' ):
-            new_model = paramater.model_resolve( paramater.model ) # this is django specific again
+            new_model = paramater.model_resolve( paramater.model )  # this is django specific again
             del paramater.model_resolve
             if not isinstance( new_model, Model ):
-              raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( item, field.model ) )
+              raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
 
             paramater.model = new_model
-
-
 
   def _validateNamespace( self, namespace ):
     for name in namespace.element_map:
@@ -905,6 +907,17 @@ class Server():
     self._validateNamespace( self.root_namespace )
 
   def handle( self, request ):
+    try:
+      for path in self.path_handlers:
+       if request.uri.startswith( path ):
+         return self.path_handlers[ path ]( request )
+
+    except Exception as e:
+      if self.debug:
+        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ), 'trace': traceback.format_exc() } )
+      else:
+        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
+
     response = None
     try:
       response = self.dispatch( request )
@@ -930,7 +943,7 @@ class Server():
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
     if self.cors_allow_list is not None:
       response.header_map[ 'Access-Control-Allow-Origin' ] = ', '.join( self.cors_allow_list )
-      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id' #TODO: probably should only list the ones actually sent
+      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id'  # TODO: probably should only list the ones actually sent
 
     return response
 
@@ -952,7 +965,7 @@ class Server():
     if not isinstance( element, Element ):
       return Response( 500, 'confused, path ("{0}") yeilded non element "{1}"'.format( request.uri, element ) )
 
-    if request.method == 'OPTIONS': # options never need auth, nor is the Cinp-Version header required, we can take care of it early
+    if request.method == 'OPTIONS':  # options never need auth, nor is the Cinp-Version header required, we can take care of it early
       response = element.options()
       if self.cors_allow_list is not None:
         response.header_map[ 'Access-Control-Allow-Methods' ] = response.header_map[ 'Allow' ]
@@ -1065,12 +1078,18 @@ class Server():
 
     parent.addElement( namespace )
 
+  def registerPathHandler( self, path, handler ):
+    if path.startswith( self.uri.root_path ):
+      raise ValueError( 'path can not be in the api root path' )
+
+    self.path_handlers[ path ] = handler
+
 
 class Request():
   def __init__( self, method, uri, header_map ):
     super().__init__()
     self.method = method
-    self.uri = uri
+    self.uri = uri  # make sure the query string/fragment/etc has allreay been stripped by the Child Class
     self.header_map = {}
     for name in header_map:
       if name in ( 'CINP-VERSION', 'AUTH-ID', 'AUTH-TOKEN', 'CONTENT-TYPE', 'FILTER', 'POSITION', 'COUNT', 'MULTI-OBJECT' ):
@@ -1095,12 +1114,22 @@ class Request():
     def fromXML( self, buff ):
       pass
 
+
 class Response():
-  def __init__( self, http_code, data=None, header_map=None ):
+  def __init__( self, http_code, data=None, header_map=None, content_type='json' ):
     super().__init__()
+    self.content_type = content_type
     self.http_code = http_code
     self.data = data
     self.header_map = header_map or {}
+
+  def buildNativeResponse( self ):
+    if self.content_type == 'json':
+      return self.asJSON()
+    elif self.content_type == 'xml':
+      return self.asXML()
+
+    return self.asText()
 
   def asText( self ):
     return None

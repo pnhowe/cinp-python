@@ -7,7 +7,7 @@ from cinp.server_common import Response, Namespace, Model
 from cinp.server_werkzeug import WerkzeugServer, WerkzeugRequest, WerkzeugResponse
 
 
-class FakeBody(): # set wsgi.input to  and instance of FakeBody, and set wsgi.input_terminated to true to make it work
+class FakeBody():  # set wsgi.input to  and instance of FakeBody, and set wsgi.input_terminated to true to make it work
   def __init__( self, data ):
     self.data = data.encode( 'utf-8' )
 
@@ -20,54 +20,54 @@ class FakeBody(): # set wsgi.input to  and instance of FakeBody, and set wsgi.in
 
 def test_werkzeug_request():
   env = {
-    'SERVER_PROTOCOL': 'HTTP/1.1',
-    'QUERY_STRING': '',
-    'HTTP_HOST': '127.0.0.1:8888',
-    'HTTP_ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'PATH_INFO': '/api/',
-    'HTTP_USER_AGENT': 'Mozilla/5.0',
-    'SERVER_PORT': '8888',
-    'HTTP_ACCEPT_ENCODING': 'gzip, deflate',
-    'SCRIPT_NAME': '',
-    'REMOTE_ADDR': '127.0.0.1',
-    'HTTP_CONNECTION': 'keep-alive',
-    'REQUEST_METHOD': 'get',
-    'wsgi.input_terminated': True,
-    'wsgi.input': FakeBody( '"test"' )
-  }
+          'SERVER_PROTOCOL': 'HTTP/1.1',
+          'QUERY_STRING': '',
+          'HTTP_HOST': '127.0.0.1:8888',
+          'HTTP_ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'PATH_INFO': '/api/',
+          'HTTP_USER_AGENT': 'Mozilla/5.0',
+          'SERVER_PORT': '8888',
+          'HTTP_ACCEPT_ENCODING': 'gzip, deflate',
+          'SCRIPT_NAME': '',
+          'REMOTE_ADDR': '127.0.0.1',
+          'HTTP_CONNECTION': 'keep-alive',
+          'REQUEST_METHOD': 'get',
+          'wsgi.input_terminated': True,
+          'wsgi.input': FakeBody( '"test"' )
+        }
   req = WerkzeugRequest( env )
   assert req.method == 'GET'
-  assert req.uri ==  '/api/'
+  assert req.uri == '/api/'
   assert req.header_map == {}
   assert req.data == 'test'
 
   env = {
-    'SERVER_PROTOCOL': 'HTTP/1.1',
-    'QUERY_STRING': '',
-    'HTTP_HOST': '127.0.0.1:8888',
-    'HTTP_ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'PATH_INFO': '/api/ns/model:key:',
-    'HTTP_USER_AGENT': 'Mozilla/5.0',
-    'SERVER_PORT': '8888',
-    'HTTP_ACCEPT_ENCODING': 'gzip, deflate',
-    'HTTP_AUTH_ID': 'root',
-    'HTTP_AUTH_TOKEN': 'kd8dkv&TTIv893ink',
-    'HTTP_FILTER': 'curent',
-    'SCRIPT_NAME': '',
-    'REMOTE_ADDR': '127.0.0.1',
-    'REQUEST_METHOD': 'DELETE',
-    'CONTENT_TYPE': 'text/json',
-    'HTTP_CINP_VERSION': '0.9',
-    'HTTP_CONNECTION': 'keep-alive',
-    'HTTP_POSITION': 50,
-    'HTTP_COUNT': 34,
-    'HTTP_MULTI_OBJECT': True,
-    'wsgi.input_terminated': True,
-    'wsgi.input': FakeBody( '{ "this": "works" }' )
-  }
+          'SERVER_PROTOCOL': 'HTTP/1.1',
+          'QUERY_STRING': '',
+          'HTTP_HOST': '127.0.0.1:8888',
+          'HTTP_ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'PATH_INFO': '/api/ns/model:key:',
+          'HTTP_USER_AGENT': 'Mozilla/5.0',
+          'SERVER_PORT': '8888',
+          'HTTP_ACCEPT_ENCODING': 'gzip, deflate',
+          'HTTP_AUTH_ID': 'root',
+          'HTTP_AUTH_TOKEN': 'kd8dkv&TTIv893ink',
+          'HTTP_FILTER': 'curent',
+          'SCRIPT_NAME': '',
+          'REMOTE_ADDR': '127.0.0.1',
+          'REQUEST_METHOD': 'DELETE',
+          'CONTENT_TYPE': 'text/json',
+          'HTTP_CINP_VERSION': '0.9',
+          'HTTP_CONNECTION': 'keep-alive',
+          'HTTP_POSITION': 50,
+          'HTTP_COUNT': 34,
+          'HTTP_MULTI_OBJECT': True,
+          'wsgi.input_terminated': True,
+          'wsgi.input': FakeBody( '{ "this": "works" }' )
+        }
   req = WerkzeugRequest( env )
   assert req.method == 'DELETE'
-  assert req.uri ==  '/api/ns/model:key:'
+  assert req.uri == '/api/ns/model:key:'
   assert req.header_map == { 'CINP-VERSION': '0.9', 'CONTENT-TYPE': 'text/json', 'FILTER': 'curent', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'kd8dkv&TTIv893ink', 'POSITION': '50', 'COUNT': '34', 'MULTI-OBJECT': 'True' }
   assert req.data == { 'this': 'works' }
 
@@ -103,12 +103,12 @@ def test_werkzeug_server():
   server.registerNamespace( '/', ns )
 
   env = {
-    'PATH_INFO': '/api/',
-    'HTTP_CINP_VERSION': '0.9',
-    'REQUEST_METHOD': 'DESCRIBE',
-    'wsgi.input_terminated': True,
-    'wsgi.input': FakeBody( '' )
-  }
+          'PATH_INFO': '/api/',
+          'HTTP_CINP_VERSION': '0.9',
+          'REQUEST_METHOD': 'DESCRIBE',
+          'wsgi.input_terminated': True,
+          'wsgi.input': FakeBody( '' )
+        }
   wresp = server.handle( env )
   assert wresp.status_code == 200
   assert wresp.headers == Headers( [ ( 'Cache-Control', 'max-age=0' ), ( 'Cinp-Version', '0.9' ), ( 'Content-Type', 'application/json;charset=utf-8' ), ( 'Content-Length', '131' ), ( 'Method', 'DESCRIBE' ), ( 'Type', 'Namespace' ) ] )

@@ -11,30 +11,39 @@ __CINP_VERSION__ = '0.9'
 __all__ = [ 'Timeout', 'ResponseError', 'InvalidRequest', 'InvalidSession',
             'NotAuthorized', 'NotFound', 'ServerError', 'CInP' ]
 
+
 class Timeout( Exception ):
   pass
+
 
 class ResponseError( Exception ):
   pass
 
+
 class InvalidRequest( Exception ):
   pass
+
 
 class InvalidSession( Exception ):
   pass
 
+
 class NotAuthorized( Exception ):
   pass
+
 
 class NotFound( Exception ):
   pass
 
+
 class ServerError( Exception ):
   pass
+
 
 class HTTPErrorProcessorPassthrough( request.HTTPErrorProcessor ):
   def http_response( self, request, response ):
     return response
+
 
 class CInP():
   def __init__( self, host, root_path, port, proxy=None ):
@@ -53,7 +62,7 @@ class CInP():
 
     self.uri = URI( root_path )
 
-    if self.proxy is not None: # have a prxy option to take it from the envrionment vars
+    if self.proxy is not None:  # have a prxy option to take it from the envrionment vars
       self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( { 'http': self.proxy, 'https': self.proxy } ) )
     else:
       self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( {} ) )
@@ -63,10 +72,10 @@ class CInP():
                                 ( 'Accepts', 'application/json' ),
                                 ( 'Accept-Charset', 'utf-8' ),
                                 ( 'Content-Type', 'application/json;charset=utf-8' ),
-                                ( 'CInP-Version',  __CINP_VERSION__ )
+                                ( 'CInP-Version', __CINP_VERSION__ )
                               ]
 
-  def _checkRequest( self, method, uri, data ): # TODO: also check if method is allowed to have headers ( other than thoes provided by the opener ), also check to make sure they are valid heaaders
+  def _checkRequest( self, method, uri, data ):  # TODO: also check if method is allowed to have headers ( other than thoes provided by the opener ), also check to make sure they are valid heaaders
     logging.debug( 'cinp: check "{0}" to "{1}"'.format( method, uri ) )
 
     if method not in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL', 'DESCRIBE' ):
@@ -144,7 +153,7 @@ class CInP():
         data = json.loads( buff )
       except ValueError:
         data = None
-        if http_code not in ( 400, 500 ): # these two codes can deal with non dict data
+        if http_code not in ( 400, 500 ):  # these two codes can deal with non dict data
           logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:100 ] ) )
           raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:100 ] ) )
 
@@ -236,7 +245,7 @@ class CInP():
     if not isinstance( position, int ) or not isinstance( count, int ) or position < 0 or count < 0:
       raise InvalidRequest( 'position and count must bot be int and greater than 0' )
 
-    header_map = { 'Position': str( position ), 'Count': str( count ) } #TODO: set position and coint to default to None, and don't send them if npt specified, rely on the server's defaults
+    header_map = { 'Position': str( position ), 'Count': str( count ) }  # TODO set position and coint to default to None, and don't send them if npt specified, rely on the server's defaults
     if filter_name is not None:
       header_map[ 'Filter' ] = filter_name
 
@@ -252,7 +261,7 @@ class CInP():
       raise ResponseError( 'Response id_list must be a list for LIST' )
 
     count_map = { 'position': 0, 'count': 0, 'total': 0 }
-    for item in ( 'Position', 'Count', 'Total' ): # NOTE: HTTP Headers typicaly are CamelCase, but we want lower case for our count dictomary
+    for item in ( 'Position', 'Count', 'Total' ):  # NOTE HTTP Headers typicaly are CamelCase, but we want lower case for our count dictomary
       try:
         count_map[ item.lower() ] = int( header_map[ item ] )
       except ( KeyError, ValueError ):
