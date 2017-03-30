@@ -63,6 +63,9 @@ class WerkzeugRequest( Request ):
     super().__init__( method=werkzeug_request.method.upper(), uri=werkzeug_request.path, header_map=header_map, *args, **kwargs )
 
     self.fromJSON( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) )  # hopfully the request isn't larger than 160k, if so, we may need to rethink things
+
+    self.remote_addr = werkzeug_request.remote_addr
+    self.is_secure = werkzeug_request.is_secure
     werkzeug_request.close()
 
 
@@ -70,7 +73,7 @@ class WerkzeugResponse():  # TODO: this should be a subclass of the server_commo
   def __init__( self, response ):
     if not isinstance( response, Response ):
       raise ValueError( 'response must be of type Response' )
-      
+
     super().__init__()
     self.content_type = response.content_type
     self.data = response.data

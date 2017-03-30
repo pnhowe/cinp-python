@@ -1089,7 +1089,7 @@ class Request():
   def __init__( self, method, uri, header_map ):
     super().__init__()
     self.method = method
-    self.uri = uri
+    self.uri = uri  # make sure the query string/fragment/etc has allreay been stripped by the Child Class
     self.header_map = {}
     for name in header_map:
       if name in ( 'CINP-VERSION', 'AUTH-ID', 'AUTH-TOKEN', 'CONTENT-TYPE', 'FILTER', 'POSITION', 'COUNT', 'MULTI-OBJECT' ):
