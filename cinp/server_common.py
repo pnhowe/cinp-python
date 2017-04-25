@@ -907,10 +907,12 @@ class Server():
     self._validateNamespace( self.root_namespace )
 
   def handle( self, request ):
+    response = None
     try:
       for path in self.path_handlers:
        if request.uri.startswith( path ):
-         return self.path_handlers[ path ]( request )
+         response = self.path_handlers[ path ]( request )
+         break
 
     except Exception as e:
       if self.debug:
@@ -918,27 +920,27 @@ class Server():
       else:
         response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
 
-    response = None
-    try:
-      response = self.dispatch( request )
+    if response is None:
+      try:
+        response = self.dispatch( request )
 
-    except ObjectNotFound as e:
-      response = e.asResponse()
+      except ObjectNotFound as e:
+        response = e.asResponse()
 
-    except InvalidRequest as e:
-      response = e.asResponse()
+      except InvalidRequest as e:
+        response = e.asResponse()
 
-    except ServerError as e:
-      response = e.asResponse()
+      except ServerError as e:
+        response = e.asResponse()
 
-    except NotAuthorized:
-      response = Response( 403, data={ 'message': 'Not Authorized' } )
+      except NotAuthorized:
+        response = Response( 403, data={ 'message': 'Not Authorized' } )
 
-    except Exception as e:
-      if self.debug:
-        response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ), 'trace': traceback.format_exc() } )
-      else:
-        response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
+      except Exception as e:
+        if self.debug:
+          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ), 'trace': traceback.format_exc() } )
+        else:
+          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
 
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
     if self.cors_allow_list is not None:
