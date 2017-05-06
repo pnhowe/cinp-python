@@ -190,6 +190,9 @@ class Converter():
 
   def _fromPython( self, paramater, python_value ):
     if paramater.type == 'String':
+      if python_value is None:
+        return None
+
       python_value = str( python_value )
       if paramater.length is not None and len( python_value ) > paramater.length:
         raise ValueError( 'String value to long' )
@@ -197,15 +200,24 @@ class Converter():
       return str( python_value )
 
     if paramater.type == 'Boolean':
+      if python_value is None:
+        return None
+
       return str( python_value  )
 
     if paramater.type == 'Integer':
+      if python_value is None:
+        return None
+
       try:
         return int( python_value )
       except ( TypeError, ValueError ):
         raise ValueError( 'Invalid int' )
 
     if paramater.type == 'Float':
+      if python_value is None:
+        return None
+
       try:
         return float( python_value )
       except ( TypeError, ValueError ):
@@ -218,6 +230,9 @@ class Converter():
       return python_value.isoformat()
 
     if paramater.type == 'Map':
+      if python_value is None:
+        return None
+        
       if not isinstance( python_value, dict ):
         raise ValueError( 'Map must be dict' )
 

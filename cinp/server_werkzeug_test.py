@@ -32,6 +32,7 @@ def test_werkzeug_request():
           'REMOTE_ADDR': '127.0.0.1',
           'HTTP_CONNECTION': 'keep-alive',
           'REQUEST_METHOD': 'get',
+          'wsgi.url_scheme': 'http',
           'wsgi.input_terminated': True,
           'wsgi.input': FakeBody( '"test"' )
         }
@@ -62,6 +63,7 @@ def test_werkzeug_request():
           'HTTP_POSITION': 50,
           'HTTP_COUNT': 34,
           'HTTP_MULTI_OBJECT': True,
+          'wsgi.url_scheme': 'http',
           'wsgi.input_terminated': True,
           'wsgi.input': FakeBody( '{ "this": "works" }' )
         }
@@ -106,6 +108,7 @@ def test_werkzeug_server():
           'PATH_INFO': '/api/',
           'HTTP_CINP_VERSION': '0.9',
           'REQUEST_METHOD': 'DESCRIBE',
+          'wsgi.url_scheme': 'http',
           'wsgi.input_terminated': True,
           'wsgi.input': FakeBody( '' )
         }

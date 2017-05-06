@@ -186,7 +186,7 @@ def test_field():
   assert converter.fromPython( field, 333 ) == '333'
   assert converter.fromPython( field, 23.32 ) == '23.32'
   assert converter.fromPython( field, 'efe' ) == 'efe'
-  assert converter.fromPython( field, None ) == 'None'
+  assert converter.fromPython( field, None ) is None
 
   with pytest.raises( ValueError ):
     converter.toPython( field, 'Much Much longer than 10 chars', None )
@@ -208,8 +208,7 @@ def test_field():
     converter.fromPython( field, '3.4' )
   with pytest.raises( ValueError ):
     converter.fromPython( field, 'wer' )
-  with pytest.raises( ValueError ):
-    converter.fromPython( field, None )
+  converter.fromPython( field, None ) is None
 
   field = Field( name='test3', type='Float' )
   assert converter.toPython( field, 12.5, None ) == 12.5
@@ -223,8 +222,7 @@ def test_field():
   assert converter.fromPython( field, '4.5' ) == 4.5
   with pytest.raises( ValueError ):
     converter.fromPython( field, 'yhn' )
-  with pytest.raises( ValueError ):
-    converter.fromPython( field, None )
+  converter.fromPython( field, None ) is None
 
   field = Field( name='test4', type='Boolean' )
   # TODO: test boolean, datatime, map, model(includeing model_resolve er) and file
