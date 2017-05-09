@@ -190,6 +190,9 @@ class Converter():
 
   def _fromPython( self, paramater, python_value ):
     if paramater.type == 'String':
+      if python_value is None:
+        return None
+
       python_value = str( python_value )
       if paramater.length is not None and len( python_value ) > paramater.length:
         raise ValueError( 'String value to long' )
@@ -197,15 +200,24 @@ class Converter():
       return str( python_value )
 
     if paramater.type == 'Boolean':
+      if python_value is None:
+        return None
+
       return str( python_value  )
 
     if paramater.type == 'Integer':
+      if python_value is None:
+        return None
+
       try:
         return int( python_value )
       except ( TypeError, ValueError ):
         raise ValueError( 'Invalid int' )
 
     if paramater.type == 'Float':
+      if python_value is None:
+        return None
+
       try:
         return float( python_value )
       except ( TypeError, ValueError ):
@@ -218,6 +230,9 @@ class Converter():
       return python_value.isoformat()
 
     if paramater.type == 'Map':
+      if python_value is None:
+        return None
+        
       if not isinstance( python_value, dict ):
         raise ValueError( 'Map must be dict' )
 
@@ -907,10 +922,12 @@ class Server():
     self._validateNamespace( self.root_namespace )
 
   def handle( self, request ):
+    response = None
     try:
       for path in self.path_handlers:
        if request.uri.startswith( path ):
-         return self.path_handlers[ path ]( request )
+         response = self.path_handlers[ path ]( request )
+         break
 
     except Exception as e:
       if self.debug:
@@ -918,27 +935,27 @@ class Server():
       else:
         response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
 
-    response = None
-    try:
-      response = self.dispatch( request )
+    if response is None:
+      try:
+        response = self.dispatch( request )
 
-    except ObjectNotFound as e:
-      response = e.asResponse()
+      except ObjectNotFound as e:
+        response = e.asResponse()
 
-    except InvalidRequest as e:
-      response = e.asResponse()
+      except InvalidRequest as e:
+        response = e.asResponse()
 
-    except ServerError as e:
-      response = e.asResponse()
+      except ServerError as e:
+        response = e.asResponse()
 
-    except NotAuthorized:
-      response = Response( 403, data={ 'message': 'Not Authorized' } )
+      except NotAuthorized:
+        response = Response( 403, data={ 'message': 'Not Authorized' } )
 
-    except Exception as e:
-      if self.debug:
-        response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ), 'trace': traceback.format_exc() } )
-      else:
-        response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
+      except Exception as e:
+        if self.debug:
+          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ), 'trace': traceback.format_exc() } )
+        else:
+          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
 
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
     if self.cors_allow_list is not None:
