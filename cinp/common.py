@@ -1,5 +1,6 @@
 import re
 
+
 class URI():
   def __init__( self, root_path ):
     super().__init__()
@@ -27,7 +28,7 @@ class URI():
       id_list = rec_id.strip( ':' ).split( ':' )
       multi = len( id_list ) > 1
     else:
-      id_list = None # id_list = [] is an empty list of ids, where None means the list is not even present
+      id_list = None  # id_list = [] is an empty list of ids, where None means the list is not even present
       multi = False
 
     if action is not None:
@@ -67,7 +68,7 @@ class URI():
 
     return result
 
-  def extractIds( self, uri_list ): #TODO: should we make sure the namespace/model do not change in the list?
+  def extractIds( self, uri_list ):  # TODO: should we make sure the namespace/model do not change in the list?
     """
     extract the  record IDs from the URI's in uri_list, can handle some/all/non
     of the URIs having multiple IDs in them allready, does not force uniqunes
@@ -79,7 +80,7 @@ class URI():
       if not uri_match:
         raise ValueError( 'Unable to parse URI "{0}"'.format( uri ) )
 
-      ( _, _, _,  _, rec_id, _, _ ) = uri_match.groups()
+      ( _, _, _, _, rec_id, _, _ ) = uri_match.groups()
       if rec_id is None:
         raise ValueError( 'No Id in URI "{0}"'.format( uri ) )
 
