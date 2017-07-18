@@ -1,17 +1,17 @@
 import re
 import django
 from django.db import DatabaseError
-from django.db.models.base import ModelBase
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models import fields
 
-from cinp.server_common import Namespace, Model, Action, Paramater, Field
+from cinp.server_common import Namespace, Model, Action, Paramater, Field, ServerError
 
 __MODEL_REGISTRY__ = {}
 
-#TODO: take advantage of .save( update_fields=.... ) on UPDATE
+# TODO: take advantage of .save( update_fields=.... ) on UPDATE
 
 NEW_REMOTE_FIELD = int( django.get_version().split( '.' )[1] ) > 8  # last known (to me) use of related was 1.8
+
 
 def field_model_resolver( django_field ):
   mode = None
@@ -87,7 +87,7 @@ def paramater_type_to_kwargs( paramater_type ):
     if paramater_model_name is not None:
       try:
         model = paramater_model_resolver( paramater_model_name )
-      except ValueError: # model_resolver had issues, try late resolving
+      except ValueError:  # model_resolver had issues, try late resolving
         result[ 'model' ] = paramater_model_name
         result[ 'model_resolve' ] = paramater_model_resolver
       else:
@@ -98,7 +98,8 @@ def paramater_type_to_kwargs( paramater_type ):
 
   return result
 
-#decorator for the models
+
+# decorator for the models
 class DjangoCInP():
   def __init__( self, name, version ):
     super().__init__()
@@ -118,7 +119,7 @@ class DjangoCInP():
     for model in self.model_list:
       check_auth = self.check_auth_map.get( model.name, None )
       if check_auth is None:
-        check_auth = lambda user, method, id_list: False
+        check_auth = lambda user, method, id_list, action=None: False
 
       namespace.addElement( model )
       model.checkAuth = check_auth
@@ -151,8 +152,8 @@ class DjangoCInP():
                    'default': django_field.default if django_field.default != fields.NOT_PROVIDED else None
                  }
 
-        if callable( kwargs[ 'default' ] ): # not something we can serilize and send over the wire, would be good to send the other end something however.
-          kwargs[ 'default' ] == None
+        if callable( kwargs[ 'default' ] ):  # not something we can serilize and send over the wire, would be good to send the other end something however.
+          kwargs[ 'default' ] = None
 
         if django_field.editable and django_field.name not in read_only_list_:
           kwargs[ 'mode' ] = 'RC' if django_field.primary_key else 'RW'
@@ -175,7 +176,7 @@ class DjangoCInP():
           kwargs[ 'type' ] = 'Integer'
 
         elif internal_type in ( 'FloatField', ) or cinp_type == 'Float':
-          kwargs[ 'type' ] =  'Float'
+          kwargs[ 'type' ] = 'Float'
 
         elif internal_type in ( 'BooleanField', 'NullBooleanField' ) or cinp_type == 'Boolean':
           kwargs[ 'type' ] = 'Boolean'
@@ -195,7 +196,7 @@ class DjangoCInP():
           try:
             ( mode, is_array, model ) = field_model_resolver( django_field )
 
-          except ValueError: # model_resolver had issues, try late resolving
+          except ValueError:  # model_resolver had issues, try late resolving
             kwargs[ 'model' ] = django_field
             kwargs[ 'model_resolve' ] = field_model_resolver
 
@@ -252,7 +253,7 @@ class DjangoCInP():
 
     return decorator
 
-  def action( self, return_type=None, paramater_type_list=None ): # must decorate the @staticmethod decorator to detect if it is static or not
+  def action( self, return_type=None, paramater_type_list=None ):  # must decorate the @staticmethod decorator to detect if it is static or not
     def decorator( func ):
       if type( func ).__name__ == 'staticmethod':
         static = True
@@ -268,7 +269,7 @@ class DjangoCInP():
       if static:
         paramater_name_list = func.__code__.co_varnames[ 0:func.__code__.co_argcount ]
       else:
-        paramater_name_list = func.__code__.co_varnames[ 1:func.__code__.co_argcount ] # skip 'self'
+        paramater_name_list = func.__code__.co_varnames[ 1:func.__code__.co_argcount ]  # skip 'self'
 
       default_list = func.__defaults__
       default_offset = len( paramater_name_list ) - len( default_list or [] )
@@ -388,7 +389,7 @@ class DjangoTransaction():
       try:
         filter_func = model._django_filter_funcs_map[ filter_name ]
       except KeyError:
-        raise ServerError( 'filter_func for "{0}" not found'.format( filter_name ) ) # the filter_name should of allready been checked, something is seriously wrong
+        raise ServerError( 'filter_func for "{0}" not found'.format( filter_name ) )  # the filter_name should of allready been checked, something is seriously wrong
 
       qs = filter_func( **filter_values ).values_list( 'pk' )
 

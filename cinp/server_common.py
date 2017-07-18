@@ -68,6 +68,7 @@ MAP_TYPE_CONVERTER = {
                        'str': str,
                        'int': str,
                        'float': str,
+                       'bool': str,
                        'datetime': lambda a: a.isoformat(),
                        'timedelta': lambda a: a.total_seconds(),
                        'dict': _dictConverter
@@ -232,7 +233,7 @@ class Converter():
     if paramater.type == 'Map':
       if python_value is None:
         return None
-        
+
       if not isinstance( python_value, dict ):
         raise ValueError( 'Map must be dict' )
 
@@ -1011,7 +1012,7 @@ class Server():
     if request.method in ( 'UPDATE', 'CREATE' ) and request.data is None:
       raise InvalidRequest( 'Method "{0}" requires data'.format( request.method ) )
 
-    if request.method in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL' ) and not model:
+    if request.method in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL' ) and not isinstance( element, Model ):
       raise InvalidRequest( 'Method "{0}" requires model'.format( request.method ) )
 
     if ( isinstance( element, Model ) and request.method in element.not_allowed_method_list ) or ( isinstance( element, Action ) and request.method in element.parent.not_allowed_method_list ):
