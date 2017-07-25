@@ -994,28 +994,28 @@ class Server():
     if request.header_map.get( 'CINP-VERSION', None ) != __CINP_VERSION__:
       return Response( 400, data={ 'message': 'Invalid CInP Protocol Version' } )
 
-    if action is not None and request.method not in ( 'CALL', 'DESCRIBE' ):
+    if ( action is not None ) and ( request.method not in ( 'CALL', 'DESCRIBE' ) ):
       raise InvalidRequest( 'Invalid method "{0}" for request with action'.format( request.method ) )
 
-    if request.method in ( 'CALL', ) and action is None:
+    if request.method in ( 'CALL', ) and not isinstance( element, Action ):
       raise InvalidRequest( 'Method "{0}" requires action'.format( request.method ) )
 
-    if id_list is not None and request.method not in ( 'GET', 'UPDATE', 'DELETE', 'CALL' ):
+    if ( id_list is not None ) and ( request.method not in ( 'GET', 'UPDATE', 'DELETE', 'CALL' ) ):
       raise InvalidRequest( 'Invalid method "{0}" for request with id'.format( request.method ) )
 
-    if request.method in ( 'GET', 'UPDATE', 'DELETE' ) and id_list is None:
+    if ( request.method in ( 'GET', 'UPDATE', 'DELETE' ) ) and ( id_list is None ):
       raise InvalidRequest( 'Method "{0}" requires id'.format( request.method ) )
 
-    if request.data is not None and request.method not in ( 'LIST', 'UPDATE', 'CREATE', 'CALL' ):
+    if ( request.data is not None ) and ( request.method not in ( 'LIST', 'UPDATE', 'CREATE', 'CALL' ) ):
       raise InvalidRequest( 'Invalid method "{0}" for request with data'.format( request.method ) )
 
-    if request.method in ( 'UPDATE', 'CREATE' ) and request.data is None:
+    if (request.method in ( 'UPDATE', 'CREATE' ) ) and ( request.data is None ):
       raise InvalidRequest( 'Method "{0}" requires data'.format( request.method ) )
 
-    if request.method in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL' ) and not isinstance( element, Model ):
+    if ( request.method in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE' ) ) and not isinstance( element, Model ):
       raise InvalidRequest( 'Method "{0}" requires model'.format( request.method ) )
 
-    if ( isinstance( element, Model ) and request.method in element.not_allowed_method_list ) or ( isinstance( element, Action ) and request.method in element.parent.not_allowed_method_list ):
+    if ( isinstance( element, Model ) and ( request.method in element.not_allowed_method_list ) ) or ( isinstance( element, Action ) and ( request.method in element.parent.not_allowed_method_list ) ):
       raise NotAuthorized()
 
     multi = id_list is not None and len( id_list ) > 1
