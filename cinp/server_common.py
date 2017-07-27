@@ -146,7 +146,7 @@ class Converter():
       if cinp_value in ( 'false', 'f', '0' ):
         return False
 
-      raise ValueError( 'Unable to conver to boolean' )
+      raise ValueError( 'Unable to convert to boolean' )
 
     if paramater.type == 'DateTime':
       if cinp_value is None or cinp_value == '':
@@ -623,7 +623,7 @@ class Model( Element ):
         except ValueError as e:
           raise InvalidRequest( 'Invalid Value "{0}" for list filter paramater "{1}" of filter "{2}"'.format( str( e ), name, filter_name ) )
         except KeyError:
-          raise InvalidRequest( 'Filter paramater "{1}" of filter "{2}" missing'.format( str( e ), name, filter_name ) )
+          raise InvalidRequest( 'Filter paramater "{0}" of filter "{1}" missing'.format( name, filter_name ) )
 
     try:
       result = transaction.list( self, filter_name, filter_values, position, count )
