@@ -68,7 +68,7 @@ MAP_TYPE_CONVERTER = {
                        'str': str,
                        'int': str,
                        'float': str,
-                       'bool': str,
+                       'bool': lambda a: True if a else False,
                        'datetime': lambda a: a.isoformat(),
                        'timedelta': lambda a: a.total_seconds(),
                        'dict': _dictConverter
