@@ -3,6 +3,8 @@
 import os
 from distutils.core import setup
 from distutils.command.build_py import build_py
+import setuptools  # so we have develop mode
+
 
 class build( build_py ):
   def run( self ):
@@ -17,12 +19,14 @@ class build( build_py ):
           continue
         self.build_module( module, module_file, package )
 
+
 setup( name='cinp',
-       version='1.0',
+       version='0.9.2',
        description='CInP, Concise Interaction Protocol',
        author='Peter Howe',
        author_email='pnhowe@gmail.com',
+       url='https://github.com/cinp/python',
+       python='~=3.5',
        packages=[ 'cinp' ],
        cmdclass={ 'build_py': build }
      )
-

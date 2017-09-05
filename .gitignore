@@ -1,7 +1,13 @@
 __pycache__
 *.pyc
-/build
 
+# setup.py temp stuff
+/build
+/dist
+/cinp.egg-info
+MANIFEST
+
+# test/lint output/temp stuff
 htmlcov
 .coverage
 .coveragerc
