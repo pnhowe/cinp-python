@@ -73,6 +73,12 @@ def paramater_type_to_kwargs( paramater_type ):
 
   if isinstance( paramater_type, dict ):
     result[ 'type' ] = paramater_type[ 'type' ]
+
+    try:
+      result[ 'doc' ] = paramater_type[ 'doc' ]
+    except KeyError:
+      pass
+
     try:
       result[ 'length' ] = paramater_type[ 'length' ]
     except KeyError:
@@ -101,12 +107,13 @@ def paramater_type_to_kwargs( paramater_type ):
 
 # decorator for the models
 class DjangoCInP():
-  def __init__( self, name, version ):
+  def __init__( self, name, version='0.0', doc='' ):
     super().__init__()
     if not re.match( '^[0-9a-zA-Z]*$', name ):
       raise ValueError( 'name "{0}" is invalid'.format( name ) )
     self.name = name
     self.version = version
+    self.doc = doc
     self.model_list = []
     self.action_map = {}
     self.check_auth_map = {}
@@ -114,7 +121,7 @@ class DjangoCInP():
 
   # this is called to get the namespace to attach to the server
   def getNamespace( self ):
-    namespace = Namespace( name=self.name, version=self.version )
+    namespace = Namespace( name=self.name, version=self.version, doc=self.doc )
     namespace.checkAuth = lambda user, method, id_list: True
     for model in self.model_list:
       check_auth = self.check_auth_map.get( model.name, None )
@@ -232,7 +239,7 @@ class DjangoCInP():
         filter_funcs_map[ filter_name ] = self.list_filter_map[ name ][ filter_name ][0]
         filter_map[ filter_name ] = self.list_filter_map[ name ][ filter_name ][1]
 
-      model = Model( name=name, transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_list=constant_list, not_allowed_method_list=not_allowed_method_list )
+      model = Model( name=name, doc=cls.__doc__.strip(), transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_list=constant_list, not_allowed_method_list=not_allowed_method_list )
       model._django_model = cls
       model._django_filter_funcs_map = filter_funcs_map
       self.model_list.append( model )
@@ -288,7 +295,12 @@ class DjangoCInP():
 
       return_paramater = Paramater( **paramater_type_to_kwargs( return_type ) )
 
-      self.action_map[ model_name ].append( Action( name=name, func=func, return_paramater=return_paramater, paramater_list=paramater_list, static=static ) )
+      try:
+        doc = func.__doc__.strip()
+      except AttributeError:
+        doc = ''
+
+      self.action_map[ model_name ].append( Action( name=name, doc=doc, func=func, return_paramater=return_paramater, paramater_list=paramater_list, static=static ) )
       return func
 
     return decorator

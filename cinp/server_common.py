@@ -4,7 +4,6 @@ import json
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '1.0'
 __CINP_VERSION__ = '0.9'
 __MULTI_URI_MAX__ = 100
 
