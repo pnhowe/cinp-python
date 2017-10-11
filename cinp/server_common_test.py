@@ -124,26 +124,26 @@ def checkAuth( user, method, id_list ):
 
 
 def test_namespace():
-  ns = Namespace( name=None, version='0.0', root_path='/api/' )
+  ns = Namespace( name=None, version='0.0', root_path='/api/', converter=None )
   assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
 
   with pytest.raises( ValueError ):
-    Namespace( name='root', version='0.0' )
+    Namespace( name='root', version='0.0', converter=None )
 
   with pytest.raises( ValueError ):
-    Namespace( name=None, version='0.0' )
+    Namespace( name=None, version='0.0', converter=None )
 
   with pytest.raises( ValueError ):
-    Namespace( name=None, version='0.0', root_path='/asd' )
+    Namespace( name=None, version='0.0', root_path='/asd', converter=None )
 
-  ns2 = Namespace( name='ns2', version='2.0' )
+  ns2 = Namespace( name='ns2', version='2.0', converter=None )
   assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
   assert sort_dsc( ns2.describe().data ) == { 'name': 'ns2', 'path': None, 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
   ns.addElement( ns2 )
   assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/' ], 'models': [], 'multi-uri-max': 100, 'doc': '' }
   assert sort_dsc( ns2.describe().data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
 
-  ns3 = Namespace( name='ns3', version='3.0' )
+  ns3 = Namespace( name='ns3', version='3.0', converter=None )
   assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/' ], 'models': [], 'multi-uri-max': 100, 'doc': '' }
   assert sort_dsc( ns2.describe().data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
   assert sort_dsc( ns3.describe().data ) == { 'name': 'ns3', 'path': None, 'api-version': '3.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
@@ -152,7 +152,7 @@ def test_namespace():
   assert sort_dsc( ns2.describe().data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
   assert sort_dsc( ns3.describe().data ) == { 'name': 'ns3', 'path': '/api/ns3/', 'api-version': '3.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
 
-  ns2_1 = Namespace( name='ns2_1', version='2.1' )
+  ns2_1 = Namespace( name='ns2_1', version='2.1', converter=None )
   assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/', '/api/ns3/' ], 'models': [], 'multi-uri-max': 100, 'doc': '' }
   assert sort_dsc( ns2.describe().data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
   assert sort_dsc( ns3.describe().data ) == { 'name': 'ns3', 'path': '/api/ns3/', 'api-version': '3.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
@@ -229,7 +229,7 @@ def test_field():
 
 
 def test_model():
-  ns = Namespace( name=None, version='0.0', root_path='/api/' )
+  ns = Namespace( name=None, version='0.0', root_path='/api/', converter=None )
 
   model1 = Model( name='model1', transaction_class=TestTransaction, field_list=[] )
   assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
@@ -258,7 +258,7 @@ def test_model():
 
 
 def test_action():
-  ns = Namespace( name=None, version='0.0', root_path='/api/' )
+  ns = Namespace( name=None, version='0.0', root_path='/api/', converter=None )
   model = Model( name='model1', transaction_class=TestTransaction, field_list=[] )
   ns.addElement( model )
 
@@ -509,10 +509,10 @@ def test_delete():
 
 def test_getElement():
   uri = URI( root_path='/api/' )
-  root_ns = Namespace( name=None, version='0.0', root_path='/api/' )
-  ns2 = Namespace( name='ns2', version='0.1' )
-  ns3 = Namespace( name='ns3', version='0.2' )
-  ns2_2 = Namespace( name='ns2_2', version='0.1' )
+  root_ns = Namespace( name=None, version='0.0', root_path='/api/', converter=None )
+  ns2 = Namespace( name='ns2', version='0.1', converter=None )
+  ns3 = Namespace( name='ns3', version='0.2', converter=None )
+  ns2_2 = Namespace( name='ns2_2', version='0.1', converter=None )
   root_ns.addElement( ns2 )
   root_ns.addElement( ns3 )
   ns2.addElement( ns2_2 )
@@ -596,7 +596,7 @@ def test_response():
 
 def test_server():
   server = Server( root_path='/api/', root_version='0.0', debug=True )
-  ns1 = Namespace( name='ns1', version='0.1' )
+  ns1 = Namespace( name='ns1', version='0.1', converter=None )
   ns1.checkAuth = lambda user, method, id_list: True
   model1 = Model( name='model1', field_list=[], transaction_class=TestTransaction )
   model1.checkAuth = lambda user, method, id_list: True
@@ -606,7 +606,7 @@ def test_server():
   ns1.addElement( model2 )
   server.registerNamespace( '/', ns1 )
 
-  ns2 = Namespace( name='ns2', version='0.2' )
+  ns2 = Namespace( name='ns2', version='0.2', converter=None )
   server.registerNamespace( '/api/', ns2 )
 
   req = Request( 'OPTIONS', '/api/', {} )
@@ -658,7 +658,7 @@ def test_server():
 
 def test_multi():
   server = Server( root_path='/api/', root_version='0.0', debug=True )
-  ns1 = Namespace( name='ns1', version='0.1' )
+  ns1 = Namespace( name='ns1', version='0.1', converter=None )
   ns1.checkAuth = lambda user, method, id_list: True
   model1 = Model( name='model1', field_list=[], transaction_class=TestTransaction )
   model1.checkAuth = lambda user, method, id_list: True
@@ -698,7 +698,7 @@ def test_multi():
 
 def test_not_allowed_methods():
   server = Server( root_path='/api/', root_version='0.0', debug=True )
-  ns1 = Namespace( name='ns1', version='0.1' )
+  ns1 = Namespace( name='ns1', version='0.1', converter=Converter( URI( '/api/' ) ) )
   ns1.checkAuth = lambda user, method, id_list: True
   field_list = []
   field_list.append( Field( name='field1', type='String', length=50 ) )
@@ -794,7 +794,7 @@ def test_not_allowed_methods():
 def test_user():
   server = Server( root_path='/api/', root_version='0.0', debug=True )
   server.getUser = getUser
-  ns1 = Namespace( name='ns1', version='0.1' )
+  ns1 = Namespace( name='ns1', version='0.1', converter=None )
   ns1.checkAuth = checkAuth
   field_list = []
   model1 = Model( name='model1', field_list=field_list, transaction_class=TestTransaction )

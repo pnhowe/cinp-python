@@ -21,7 +21,7 @@ class build( build_py ):
 
 
 setup( name='cinp',
-       version='0.9.2',
+       version='0.9.3',
        description='CInP, Concise Interaction Protocol',
        author='Peter Howe',
        author_email='pnhowe@gmail.com',

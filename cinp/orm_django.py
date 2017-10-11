@@ -1,10 +1,12 @@
 import re
+import random
 import django
 from django.db import DatabaseError
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models import fields
+from django.core.files import File
 
-from cinp.server_common import Namespace, Model, Action, Paramater, Field, ServerError
+from cinp.server_common import Converter, Namespace, Model, Action, Paramater, Field, ServerError
 
 __MODEL_REGISTRY__ = {}
 
@@ -89,6 +91,11 @@ def paramater_type_to_kwargs( paramater_type ):
     except KeyError:
       pass
 
+    try:
+      result[ 'allowed_scheme_list' ] = paramater_type[ 'allowed_scheme_list' ]
+    except KeyError:
+      pass
+
     paramater_model_name = paramater_type.get( 'model', None )
     if paramater_model_name is not None:
       try:
@@ -103,6 +110,42 @@ def paramater_type_to_kwargs( paramater_type ):
     result[ 'type' ] = paramater_type
 
   return result
+
+
+class DjangoConverter( Converter ):
+  def _toPython( self, paramater, cinp_value, transaction ):
+    if paramater.type == 'File':
+      value = super()._toPython( paramater, cinp_value, transaction )
+      if value is None:
+        return None
+
+      ( reader, filename ) = value
+
+      if filename is None:
+        filename = ''.join( random.choice( '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-', k=20 ) )
+
+      if isinstance( paramater, Field ):
+        return File( paramater.django_field.save( filename, reader ) )
+
+      else:
+        return File( reader, filename )
+
+    return super()._toPython( paramater, cinp_value, transaction )
+
+  def _fromPython( self, paramater, python_value ):
+    if paramater.type == 'Model':
+      if python_value is None:
+        return None
+
+      return '{0}:{1}:'.format( paramater.model.path, python_value.pk )
+
+    if paramater.type == 'File':
+      if python_value is None:
+        return None
+
+      return python_value.url
+
+    return super()._fromPython( paramater, python_value )
 
 
 # decorator for the models
@@ -120,8 +163,8 @@ class DjangoCInP():
     self.list_filter_map = {}
 
   # this is called to get the namespace to attach to the server
-  def getNamespace( self ):
-    namespace = Namespace( name=self.name, version=self.version, doc=self.doc )
+  def getNamespace( self, uri ):
+    namespace = Namespace( name=self.name, version=self.version, doc=self.doc, converter=DjangoConverter( uri ) )
     namespace.checkAuth = lambda user, method, id_list: True
     for model in self.model_list:
       check_auth = self.check_auth_map.get( model.name, None )
@@ -196,6 +239,7 @@ class DjangoCInP():
 
         elif internal_type in ( 'FileField', 'ImageField' ) or cinp_type == 'File':
           kwargs[ 'type' ] = 'File'
+          kwargs[ 'allowed_scheme_list' ] = None  # find some meta location to pass this in
 
         elif internal_type in ( 'ForeignKey', 'ManyToManyField', 'OneToOneField' ) or cinp_type == 'Modal':
           kwargs[ 'type' ] = 'Model'
