@@ -533,8 +533,10 @@ class Model( Element ):
     for method in not_allowed_method_list or []:
       if method == 'OPTIONS':
         raise ValueError( 'Can not block OPTIONS method' )
+
       if method not in ( 'GET', 'LIST', 'CALL', 'CREATE', 'UPDATE', 'DELETE', 'DESCRIBE' ):
         raise ValueError( 'Invalid blocked Method "{0}"'.format( method ) )
+
       self.not_allowed_method_list.append( method )
 
   @property

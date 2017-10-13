@@ -12,3 +12,11 @@ htmlcov
 .coverage
 .coveragerc
 .cache
+
+
+debian/files
+debian/python-module-stampdir/
+debian/python3-cinp.debhelper.log
+debian/python3-cinp.substvars
+debian/python3-cinp/
+

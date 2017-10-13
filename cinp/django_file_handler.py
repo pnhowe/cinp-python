@@ -68,6 +68,18 @@ def upload_view( django_request ):
 
 # for gnuicorn apps
 def upload_handler( request ):  # TODO: also support multi-part
+  if request.method == 'OPTIONS':
+    header_map = {}
+    header_map[ 'Allow' ] = 'OPTIONS, POST'
+    header_map[ 'Cache-Control' ] = 'max-age=0'
+    header_map[ 'Access-Control-Allow-Methods' ] = header_map[ 'Allow' ]
+    header_map[ 'Access-Control-Allow-Headers' ] = 'Accept, Content-Type, Content-Disposition'
+
+    return Response( 200, data=None, header_map=header_map )
+
+  if request.method != 'POST':
+    return Response( 400, data='Invalid Method', content_type='text' )
+
   if request.header_map.get( 'CONTENT-TYPE', None ) != 'application/octet-stream':
     return Response( 400, data='Invalid Content-Type', content_type='text' )
 
