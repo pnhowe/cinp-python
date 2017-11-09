@@ -1,8 +1,22 @@
 __pycache__
 *.pyc
-/build
 
+# setup.py temp stuff
+/build
+/dist
+/cinp.egg-info
+MANIFEST
+
+# test/lint output/temp stuff
 htmlcov
 .coverage
 .coveragerc
 .cache
+
+
+debian/files
+debian/python-module-stampdir/
+debian/python3-cinp.debhelper.log
+debian/python3-cinp.substvars
+debian/python3-cinp/
+

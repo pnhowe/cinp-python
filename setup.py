@@ -3,6 +3,8 @@
 import os
 from distutils.core import setup
 from distutils.command.build_py import build_py
+import setuptools  # so we have develop mode
+
 
 class build( build_py ):
   def run( self ):
@@ -17,12 +19,26 @@ class build( build_py ):
           continue
         self.build_module( module, module_file, package )
 
+
 setup( name='cinp',
-       version='1.0',
+       version='0.9.3',
        description='CInP, Concise Interaction Protocol',
+       long_description="""A HTTP/JSON Protocol that brongs some of the
+flexability of REST, but extends beyond CRUD to support Metod Calling and
+fully describing the enpoints and data sctuctures.  As well as enabeling
+the Business Logic and permissions to be fully encapsulated on the Server.""",
        author='Peter Howe',
        author_email='pnhowe@gmail.com',
+       url='https://github.com/cinp/python',
+       python='~=3.4',
+       license='Apache2',
+       classifiers=[
+          'Development Status :: 4 - Beta',
+          'Intended Audience :: Developers',
+          'License :: OSI Approved :: Apache Software License',
+          'Programming Language :: Python :: 3',
+          'Programming Language :: Python :: 3.4'
+       ],
        packages=[ 'cinp' ],
        cmdclass={ 'build_py': build }
      )
-

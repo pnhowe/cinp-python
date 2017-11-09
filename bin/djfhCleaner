@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+
+from cinp.django_file_handler import cleaner
+
+cleaner()

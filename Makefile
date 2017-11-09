@@ -12,3 +12,4 @@ demo:
 	sleep 2
 	rm /tmp/cinp_demo_server.pid
 	rm server_test/db.sqlite3
+

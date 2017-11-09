@@ -3,7 +3,7 @@ import json
 import logging
 from importlib import import_module
 
-from cinp.server_common import Server, Request, Response, Namespace
+from cinp.server_common import Server, Request, Response, Namespace, Converter, InvalidRequest
 
 
 class WerkzeugServer( Server ):
@@ -26,7 +26,7 @@ class WerkzeugServer( Server ):
       return WerkzeugResponse( response ).buildNativeResponse()
 
     except Exception as e:
-      logging.error( 'Top level Exception, "{0}"({1})'.format( str( e ), type( e ).__name__ ) )
+      logging.exception( 'Top level Exception, "{0}"({1})'.format( str( e ), type( e ).__name__ ) )
       return werkzeug.wrappers.BaseResponse( response='Error getting WerkzeugResponse, "{0}"({1})'.format( str( e ), type( e ).__name__ ), status=500, content_type='text/plain' )
 
   def __call__( self, envrionment, start_response ):
@@ -41,14 +41,14 @@ class WerkzeugServer( Server ):
       if name is None or version is None:
         raise ValueError( 'name and version must be specified if no module is specified' )
 
-      namespace = Namespace( name=name, version=version )
+      namespace = Namespace( name=name, version=version, converter=Converter( self.uri ) )
 
     else:
       if isinstance( module, Namespace ):
         namespace = module
       else:
         module = import_module( '{0}.models'.format( module ) )
-        namespace = module.cinp.getNamespace()
+        namespace = module.cinp.getNamespace( self.uri )
 
     super().registerNamespace( path, namespace )
 
@@ -62,11 +62,32 @@ class WerkzeugRequest( Request ):
 
     super().__init__( method=werkzeug_request.method.upper(), uri=werkzeug_request.path, header_map=header_map, *args, **kwargs )
 
-    self.fromJSON( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) )  # hopfully the request isn't larger than 160k, if so, we may need to rethink things
+    content_type = self.header_map.get( 'CONTENT-TYPE', None )
+    if content_type is not None:  # if it is none, there isn't (or shoudn't) be anthing to bring in anyway
+      if content_type.startswith( 'application/json' ):
+        self.fromJSON( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) )  # hopfully the request isn't larger than 160k, if so, we may need to rethink things
+
+      elif content_type.startswith( 'text/plain' ):
+        self.fromText( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) )
+
+      elif content_type.startswith( 'application/xml' ):
+        self.fromXML( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) )
+
+      elif content_type.startswith( 'application/octet-stream' ):
+        self.stream = werkzeug_request.stream
+        if 'CONTENT-DISPOSITION' in header_map:  # cheet a little, Content-Disposition isn't pure CInP, but this is a bolt on file uploader
+          self.header_map[ 'CONTENT-DISPOSITION' ] = header_map[ 'CONTENT-DISPOSITION' ]
+        pass  # do nothing, down stream is going to have to read from the stream
+
+      else:
+        raise InvalidRequest( message='Unknown Content-Type "{0}"'.format( content_type ) )
 
     self.remote_addr = werkzeug_request.remote_addr
     self.is_secure = werkzeug_request.is_secure
     werkzeug_request.close()
+
+  def read( self, size ):
+    return self.stream.read( size )
 
 
 class WerkzeugResponse():  # TODO: this should be a subclass of the server_common Response, to much redundant stuff
@@ -87,11 +108,13 @@ class WerkzeugResponse():  # TODO: this should be a subclass of the server_commo
       return self.asJSON()
     elif self.content_type == 'xml':
       return self.asXML()
+    elif self.content_type == 'bytes':
+      return self.asBytes()
 
     return self.asText()
 
   def asText( self ):
-    return werkzeug.wrappers.BaseResponse( response=self.data, status=self.status, headers=self.header_list, content_type='text/plain;charset=utf-8' )
+    return werkzeug.wrappers.BaseResponse( response=self.data.encode( 'utf-8' ), status=self.status, headers=self.header_list, content_type='text/plain;charset=utf-8' )
 
   def asJSON( self ):
     if self.data is None:
@@ -103,3 +126,6 @@ class WerkzeugResponse():  # TODO: this should be a subclass of the server_commo
 
   def asXML( self ):
     return werkzeug.wrappers.BaseResponse( response='<xml>Not Implemented</xml>', status=self.response.http_code, headers=self.header_list, content_type='application/xml;charset=utf-8' )
+
+  def asBytes( self ):
+    return werkzeug.wrappers.BaseResponse( response=self.data, status=self.status, headers=self.header_list, content_type='application/octet-stream'  )

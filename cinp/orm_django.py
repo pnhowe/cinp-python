@@ -1,10 +1,12 @@
 import re
+import random
 import django
 from django.db import DatabaseError
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models import fields
+from django.core.files import File
 
-from cinp.server_common import Namespace, Model, Action, Paramater, Field, ServerError
+from cinp.server_common import Converter, Namespace, Model, Action, Paramater, Field, ServerError
 
 __MODEL_REGISTRY__ = {}
 
@@ -73,6 +75,12 @@ def paramater_type_to_kwargs( paramater_type ):
 
   if isinstance( paramater_type, dict ):
     result[ 'type' ] = paramater_type[ 'type' ]
+
+    try:
+      result[ 'doc' ] = paramater_type[ 'doc' ]
+    except KeyError:
+      pass
+
     try:
       result[ 'length' ] = paramater_type[ 'length' ]
     except KeyError:
@@ -80,6 +88,11 @@ def paramater_type_to_kwargs( paramater_type ):
 
     try:
       result[ 'is_array' ] = paramater_type[ 'is_array' ]
+    except KeyError:
+      pass
+
+    try:
+      result[ 'allowed_scheme_list' ] = paramater_type[ 'allowed_scheme_list' ]
     except KeyError:
       pass
 
@@ -99,22 +112,59 @@ def paramater_type_to_kwargs( paramater_type ):
   return result
 
 
+class DjangoConverter( Converter ):
+  def _toPython( self, paramater, cinp_value, transaction ):
+    if paramater.type == 'File':
+      value = super()._toPython( paramater, cinp_value, transaction )
+      if value is None:
+        return None
+
+      ( reader, filename ) = value
+
+      if filename is None:
+        filename = ''.join( random.choice( '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-', k=20 ) )
+
+      if isinstance( paramater, Field ):
+        return File( paramater.django_field.save( filename, reader ) )
+
+      else:
+        return File( reader, filename )
+
+    return super()._toPython( paramater, cinp_value, transaction )
+
+  def _fromPython( self, paramater, python_value ):
+    if paramater.type == 'Model':
+      if python_value is None:
+        return None
+
+      return '{0}:{1}:'.format( paramater.model.path, python_value.pk )
+
+    if paramater.type == 'File':
+      if python_value is None:
+        return None
+
+      return python_value.url
+
+    return super()._fromPython( paramater, python_value )
+
+
 # decorator for the models
 class DjangoCInP():
-  def __init__( self, name, version ):
+  def __init__( self, name, version='0.0', doc='' ):
     super().__init__()
     if not re.match( '^[0-9a-zA-Z]*$', name ):
       raise ValueError( 'name "{0}" is invalid'.format( name ) )
     self.name = name
     self.version = version
+    self.doc = doc
     self.model_list = []
     self.action_map = {}
     self.check_auth_map = {}
     self.list_filter_map = {}
 
   # this is called to get the namespace to attach to the server
-  def getNamespace( self ):
-    namespace = Namespace( name=self.name, version=self.version )
+  def getNamespace( self, uri ):
+    namespace = Namespace( name=self.name, version=self.version, doc=self.doc, converter=DjangoConverter( uri ) )
     namespace.checkAuth = lambda user, method, id_list: True
     for model in self.model_list:
       check_auth = self.check_auth_map.get( model.name, None )
@@ -189,6 +239,7 @@ class DjangoCInP():
 
         elif internal_type in ( 'FileField', 'ImageField' ) or cinp_type == 'File':
           kwargs[ 'type' ] = 'File'
+          kwargs[ 'allowed_scheme_list' ] = None  # find some meta location to pass this in
 
         elif internal_type in ( 'ForeignKey', 'ManyToManyField', 'OneToOneField' ) or cinp_type == 'Modal':
           kwargs[ 'type' ] = 'Model'
@@ -232,7 +283,7 @@ class DjangoCInP():
         filter_funcs_map[ filter_name ] = self.list_filter_map[ name ][ filter_name ][0]
         filter_map[ filter_name ] = self.list_filter_map[ name ][ filter_name ][1]
 
-      model = Model( name=name, transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_list=constant_list, not_allowed_method_list=not_allowed_method_list )
+      model = Model( name=name, doc=cls.__doc__.strip(), transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_list=constant_list, not_allowed_method_list=not_allowed_method_list )
       model._django_model = cls
       model._django_filter_funcs_map = filter_funcs_map
       self.model_list.append( model )
@@ -288,7 +339,12 @@ class DjangoCInP():
 
       return_paramater = Paramater( **paramater_type_to_kwargs( return_type ) )
 
-      self.action_map[ model_name ].append( Action( name=name, func=func, return_paramater=return_paramater, paramater_list=paramater_list, static=static ) )
+      try:
+        doc = func.__doc__.strip()
+      except AttributeError:
+        doc = ''
+
+      self.action_map[ model_name ].append( Action( name=name, doc=doc, func=func, return_paramater=return_paramater, paramater_list=paramater_list, static=static ) )
       return func
 
     return decorator
