@@ -177,7 +177,7 @@ class Converter():
       if self.uri.build( path, model ) != paramater.model.path:
         raise ValueError( 'Object "{0}" is for a model other than "{1}"'.format( cinp_value, paramater.model.path )  )
 
-      result = transaction.get( paramater.model, id_list[0] )   # TODO: handle multi id id_lists  right
+      result = transaction.get( paramater.model, id_list[0] )   # TODO: handle multi id id_lists right
       if result is None:
         raise ValueError( 'Object "{0}" for model "{1}" NotFound'.format( cinp_value, paramater.model.path ) )
 
@@ -908,11 +908,19 @@ class Server():
 
       for action_name in model.action_map:
         action = model.action_map[ action_name ]
+        if action.return_paramater.type == 'Model' and hasattr( action.return_paramater, 'model_resolve' ):
+          new_model = action.return_paramater.model_resolve( action.return_paramater.model )  # this is django specific again
+          del action.return_paramater.model_resolve
+          if not isinstance( new_model, Model ):
+            raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+
+          action.return_paramater.model = new_model
+
         paramater_map = action.paramater_map
         for paramater_name in paramater_map:
           paramater = paramater_map[ paramater_name ]
           if paramater.type == 'Model' and hasattr( paramater, 'model_resolve' ):
-            ( _, _, new_model ) = paramater.model_resolve( paramater.model )  # this is django specific again
+            new_model = paramater.model_resolve( paramater.model )  # this is django specific again
             del paramater.model_resolve
             if not isinstance( new_model, Model ):
               raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )

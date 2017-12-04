@@ -283,7 +283,12 @@ class DjangoCInP():
         filter_funcs_map[ filter_name ] = self.list_filter_map[ name ][ filter_name ][0]
         filter_map[ filter_name ] = self.list_filter_map[ name ][ filter_name ][1]
 
-      model = Model( name=name, doc=cls.__doc__.strip(), transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_list=constant_list, not_allowed_method_list=not_allowed_method_list )
+      try:
+        doc = cls.__doc__.strip()
+      except AttributeError:
+        doc = None
+
+      model = Model( name=name, doc=doc, transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_list=constant_list, not_allowed_method_list=not_allowed_method_list )
       model._django_model = cls
       model._django_filter_funcs_map = filter_funcs_map
       self.model_list.append( model )

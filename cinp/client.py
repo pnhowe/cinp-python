@@ -1,5 +1,4 @@
 import os
-import re
 import socket
 import json
 import logging
@@ -167,8 +166,8 @@ class CInP():
       except ValueError:
         data = None
         if http_code not in ( 400, 500 ):  # these two codes can deal with non dict data
-          logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:100 ] ) )
-          raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:100 ] ) )
+          logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
+          raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
 
     header_map = {}
     for item in ( 'Position', 'Count', 'Total', 'Type', 'Multi-Object', 'Object-Id', 'Method' ):
@@ -183,7 +182,7 @@ class CInP():
       try:
         message = data[ 'message' ]
       except ( KeyError, ValueError, TypeError ):
-        message = buff[ 0:100 ]
+        message = buff[ 0:200 ]
 
       logging.warning( 'cinp: Invalid Request "{0}"'.format( message ) )
       raise InvalidRequest( message )
@@ -211,7 +210,7 @@ class CInP():
             message = data
 
       else:
-        message = 'Server Error: "{0}"'.format( buff[ 0:100 ] )
+        message = 'Server Error: "{0}"'.format( buff[ 0:200 ] )
 
       logging.error( 'cinp: {0}'.format( message ) )
       raise ServerError( message )

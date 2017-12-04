@@ -70,10 +70,13 @@ class URI():
 
   def extractIds( self, uri_list ):  # TODO: should we make sure the namespace/model do not change in the list?
     """
-    extract the  record IDs from the URI's in uri_list, can handle some/all/non
+    extract the record IDs from the URI's in uri_list, can handle some/all/none
     of the URIs having multiple IDs in them allready, does not force uniqunes
     order should remain intact
     """
+    if isinstance( uri_list, str ):
+      uri_list = [ uri_list ]
+
     result = []
     for uri in uri_list:
       uri_match = self.uri_regex.match( uri )
