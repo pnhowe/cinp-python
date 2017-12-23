@@ -1,8 +1,8 @@
 import os
-import re
 import socket
 import json
 import logging
+from datetime import datetime
 from tempfile import NamedTemporaryFile
 from urllib import request
 
@@ -65,7 +65,7 @@ class CInP():
 
     self.uri = URI( root_path )
 
-    if self.proxy is not None:  # have a prxy option to take it from the envrionment vars
+    if self.proxy is not None:  # have a proxy option to take it from the envrionment vars
       self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( { 'http': self.proxy, 'https': self.proxy } ) )
     else:
       self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( {} ) )
@@ -132,7 +132,7 @@ class CInP():
       if data is None:
         data = ''.encode( 'utf-8' )
       else:
-        data = json.dumps( data ).encode( 'utf-8' )
+        data = json.dumps( data, default=JSONDefault ).encode( 'utf-8' )
 
     url = '{0}:{1}{2}'.format( self.host, self.port, uri )
     req = request.Request( url, data=data, headers=header_map )
@@ -167,8 +167,8 @@ class CInP():
       except ValueError:
         data = None
         if http_code not in ( 400, 500 ):  # these two codes can deal with non dict data
-          logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:100 ] ) )
-          raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:100 ] ) )
+          logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
+          raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
 
     header_map = {}
     for item in ( 'Position', 'Count', 'Total', 'Type', 'Multi-Object', 'Object-Id', 'Method' ):
@@ -183,7 +183,7 @@ class CInP():
       try:
         message = data[ 'message' ]
       except ( KeyError, ValueError, TypeError ):
-        message = buff[ 0:100 ]
+        message = buff[ 0:200 ]
 
       logging.warning( 'cinp: Invalid Request "{0}"'.format( message ) )
       raise InvalidRequest( message )
@@ -211,7 +211,7 @@ class CInP():
             message = data
 
       else:
-        message = 'Server Error: "{0}"'.format( buff[ 0:100 ] )
+        message = 'Server Error: "{0}"'.format( buff[ 0:200 ] )
 
       logging.error( 'cinp: {0}'.format( message ) )
       raise ServerError( message )
@@ -570,3 +570,10 @@ class _readerWrapper():
       self._cb( self._reader.tell(), self._size )
     buff = self._reader.read( size )
     return buff
+
+
+def JSONDefault( obj ):
+   if isinstance( obj, datetime ):
+     return obj.isoformat()
+
+   return json.JSONEncoder.default( obj )

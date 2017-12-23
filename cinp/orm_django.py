@@ -1,7 +1,7 @@
 import re
 import random
 import django
-from django.db import DatabaseError
+from django.db import DatabaseError, models
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models import fields
 from django.core.files import File
@@ -51,6 +51,9 @@ def field_model_resolver( django_field ):
 
   else:
     django_model = remote_field.model
+
+  if not isinstance( django_model, models.base.ModelBase ):
+    raise ValueError( 'Remote Field model is not a model type, got "{0}"({1})'.format( django_model, type( django_model ) ) )
 
   target_model_name = '{0}.{1}'.format( django_model.__module__, django_model.__qualname__ )
   try:
@@ -283,7 +286,12 @@ class DjangoCInP():
         filter_funcs_map[ filter_name ] = self.list_filter_map[ name ][ filter_name ][0]
         filter_map[ filter_name ] = self.list_filter_map[ name ][ filter_name ][1]
 
-      model = Model( name=name, doc=cls.__doc__.strip(), transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_list=constant_list, not_allowed_method_list=not_allowed_method_list )
+      try:
+        doc = cls.__doc__.strip()
+      except AttributeError:
+        doc = None
+
+      model = Model( name=name, doc=doc, transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_list=constant_list, not_allowed_method_list=not_allowed_method_list )
       model._django_model = cls
       model._django_filter_funcs_map = filter_funcs_map
       self.model_list.append( model )
