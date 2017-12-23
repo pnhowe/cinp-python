@@ -23,7 +23,7 @@ class build( build_py ):
 setup( name='cinp',
        version='0.9.4',
        description='CInP, Concise Interaction Protocol',
-       long_description="""A HTTP/JSON Protocol that brongs some of the
+       long_description="""A HTTP/JSON Protocol that brings some of the
 flexability of REST, but extends beyond CRUD to support Metod Calling and
 fully describing the enpoints and data sctuctures.  As well as enabeling
 the Business Logic and permissions to be fully encapsulated on the Server.""",
