@@ -2,6 +2,7 @@ import os
 import socket
 import json
 import logging
+from datetime import datetime
 from tempfile import NamedTemporaryFile
 from urllib import request
 
@@ -64,7 +65,7 @@ class CInP():
 
     self.uri = URI( root_path )
 
-    if self.proxy is not None:  # have a prxy option to take it from the envrionment vars
+    if self.proxy is not None:  # have a proxy option to take it from the envrionment vars
       self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( { 'http': self.proxy, 'https': self.proxy } ) )
     else:
       self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( {} ) )
@@ -131,7 +132,7 @@ class CInP():
       if data is None:
         data = ''.encode( 'utf-8' )
       else:
-        data = json.dumps( data ).encode( 'utf-8' )
+        data = json.dumps( data, default=JSONDefault ).encode( 'utf-8' )
 
     url = '{0}:{1}{2}'.format( self.host, self.port, uri )
     req = request.Request( url, data=data, headers=header_map )
@@ -569,3 +570,10 @@ class _readerWrapper():
       self._cb( self._reader.tell(), self._size )
     buff = self._reader.read( size )
     return buff
+
+
+def JSONDefault( obj ):
+   if isinstance( obj, datetime ):
+     return obj.isoformat()
+
+   return json.JSONEncoder.default( obj )

@@ -1,7 +1,7 @@
 import re
 import random
 import django
-from django.db import DatabaseError
+from django.db import DatabaseError, models
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db.models import fields
 from django.core.files import File
@@ -51,6 +51,9 @@ def field_model_resolver( django_field ):
 
   else:
     django_model = remote_field.model
+
+  if not isinstance( django_model, models.base.ModelBase ):
+    raise ValueError( 'Remote Field model is not a model type, got "{0}"({1})'.format( django_model, type( django_model ) ) )
 
   target_model_name = '{0}.{1}'.format( django_model.__module__, django_model.__qualname__ )
   try:

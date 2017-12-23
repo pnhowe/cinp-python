@@ -1,4 +1,4 @@
-import dateutil
+from dateutil import parser as datetimeparser
 import traceback
 import json
 from urllib import parse
@@ -155,7 +155,7 @@ class Converter():
         return None
 
       try:
-        return dateutil.parser.parse( cinp_value )
+        return datetimeparser.parse( cinp_value )
       except ( AttributeError, ValueError ):
         raise ValueError( 'DateUtil value must be a string in a format dateutil can understand' )
 
@@ -593,11 +593,11 @@ class Model( Element ):
     result = {}
     for field_name in self.field_map:
       try:
-        result[ field_name ] = converter.fromPython( self.field_map[ field_name ], getattr( target_object, field_name ) )
+        result[ field_name ] = converter.fromPython( self.field_map[ field_name ], getattr( target_object, field_name ) )  # TODO: disguinsh between the AttributeError oflooking up the field, and any errors pulling the field value might cause
       except ValueError as e:
         raise ValueError( 'Error with "{0}": "{1}"'.format( field_name, str( e ) ) )
       except AttributeError:
-        raise ServerError( 'taret_object missing field "{0}"'.format( field_name ) )  # yes, internal server error, target_object comes from inside the house
+        raise ServerError( 'target_object missing field "{0}"'.format( field_name ) )  # yes, internal server error, target_object comes from inside the house
 
     return result
 
