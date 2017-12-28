@@ -356,7 +356,7 @@ class Paramater():
       result[ 'uri' ] = self.model.path
 
     if self.type == 'File':
-      result[ 'allowed_scheme_list' ] = self.allowed_scheme_list
+      result[ 'allowed_schemes' ] = self.allowed_scheme_list
 
     if self.type is not None:
       if self.choice_list:
@@ -516,7 +516,7 @@ class Namespace( Element ):
 
 
 class Model( Element ):
-  def __init__( self, field_list, transaction_class, list_filter_map=None, constant_list=None, not_allowed_method_list=None, *args, **kwargs ):
+  def __init__( self, field_list, transaction_class, list_filter_map=None, constant_set_map=None, not_allowed_method_list=None, *args, **kwargs ):
     super().__init__( *args, **kwargs )
     self.transaction_class = transaction_class
     self.field_map = {}
@@ -528,7 +528,7 @@ class Model( Element ):
 
     self.action_map = {}
     self.list_filter_map = list_filter_map or {}  # TODO: check list_filter_map  for  saninty, should  be [ filter_name ][ paramater_name ] = Paramater
-    self.constant_list = constant_list or []
+    self.constant_set_map = constant_set_map or {}
     self.not_allowed_method_list = []
     for method in not_allowed_method_list or []:
       if method == 'OPTIONS':
@@ -567,7 +567,9 @@ class Model( Element ):
 
   def describe( self ):
     data = { 'name': self.name, 'path': self.path, 'doc': self.doc }
-    data[ 'constants' ] = self.constant_list
+    data[ 'constants' ] = {}
+    for name in self.constant_set_map:
+      data[ 'constants' ][ name ] = self.constant_set_map[ name ]
     data[ 'fields' ] = [ item.describe() for item in self.field_map.values() ]
     data[ 'actions' ] = [ item.path for item in self.action_map.values() ]
     data[ 'not-allowed-metods' ] = self.not_allowed_method_list
@@ -637,14 +639,18 @@ class Model( Element ):
       except KeyError:
         raise InvalidRequest( 'Invalid Filter Name "{0}"'.format( filter_name ) )
 
-      for name in paramater_map:
-        paramater = paramater_map[ name ]
+      error_map = {}
+      for paramater_name in paramater_map:
+        paramater = paramater_map[ paramater_name ]
         try:
-          filter_values[ name ] = converter.toPython( paramater, data[ name ], transaction )
+          filter_values[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
         except ValueError as e:
-          raise InvalidRequest( 'Invalid Value "{0}" for list filter paramater "{1}" of filter "{2}"'.format( str( e ), name, filter_name ) )
+          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( str( e ) )
         except KeyError:
-          raise InvalidRequest( 'Filter paramater "{0}" of filter "{1}" missing'.format( name, filter_name ) )
+          error_map[ paramater_name ] = 'Required Paramater'
+
+      if error_map != {}:
+        raise InvalidRequest( data=error_map )
 
     try:
       result = transaction.list( self, filter_name, filter_values, position, count )
