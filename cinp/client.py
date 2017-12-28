@@ -1,11 +1,14 @@
+import os
 import socket
 import json
 import logging
+from datetime import datetime
+from tempfile import NamedTemporaryFile
 from urllib import request
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '0.9.0'
+__CLIENT_VERSION__ = '0.9.3'
 __CINP_VERSION__ = '0.9'
 
 __all__ = [ 'Timeout', 'ResponseError', 'InvalidRequest', 'InvalidSession',
@@ -62,16 +65,15 @@ class CInP():
 
     self.uri = URI( root_path )
 
-    if self.proxy is not None:  # have a prxy option to take it from the envrionment vars
+    if self.proxy is not None:  # have a proxy option to take it from the envrionment vars
       self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( { 'http': self.proxy, 'https': self.proxy } ) )
     else:
       self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( {} ) )
 
     self.opener.addheaders = [
-                                ( 'User-Agent', 'python client {0}'.format( __CLIENT_VERSION__ ) ),
+                                ( 'User-Agent', 'python CInP client {0}'.format( __CLIENT_VERSION__ ) ),
                                 ( 'Accepts', 'application/json' ),
                                 ( 'Accept-Charset', 'utf-8' ),
-                                ( 'Content-Type', 'application/json;charset=utf-8' ),
                                 ( 'CInP-Version', __CINP_VERSION__ )
                               ]
 
@@ -118,11 +120,19 @@ class CInP():
     if header_map is None:
       header_map = {}
 
-    self._checkRequest( method, uri, data )
-    if data is None:
-      data = ''.encode( 'utf-8' )
+    if method == 'UPLOAD':  # not a CINP method, just using it to bypass some checking here in _request
+      header_map[ 'Content-Type' ] = 'application/octet-stream'
+      if not hasattr( data, 'read' ):
+        raise InvalidRequest( 'data must be an readable stream' )
+      method = 'POST'  # not to be handled by CInP on the other end, but by a bolt on file upload handler
+
     else:
-      data = json.dumps( data ).encode( 'utf-8' )
+      header_map[ 'Content-Type' ] = 'application/json;charset=utf-8'
+      self._checkRequest( method, uri, data )
+      if data is None:
+        data = ''.encode( 'utf-8' )
+      else:
+        data = json.dumps( data, default=JSONDefault ).encode( 'utf-8' )
 
     url = '{0}:{1}{2}'.format( self.host, self.port, uri )
     req = request.Request( url, data=data, headers=header_map )
@@ -139,8 +149,11 @@ class CInP():
 
       raise ResponseError( 'URLError "{0}" for "{1}" via "{2}"'.format( e, url, self.proxy ) )
 
+    except socket.timeout:
+      raise Timeout( 'Request Timeout after {0} seconds'.format( timeout ) )
+
     http_code = resp.code
-    if http_code not in ( 200, 201, 400, 401, 403, 404, 500 ):
+    if http_code not in ( 200, 201, 202, 400, 401, 403, 404, 500 ):
       raise ResponseError( 'HTTP code "{0}" unhandled'.format( resp.code ) )
 
     logging.debug( 'cinp: got http code "{0}"'.format( http_code ) )
@@ -154,8 +167,8 @@ class CInP():
       except ValueError:
         data = None
         if http_code not in ( 400, 500 ):  # these two codes can deal with non dict data
-          logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:100 ] ) )
-          raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:100 ] ) )
+          logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
+          raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
 
     header_map = {}
     for item in ( 'Position', 'Count', 'Total', 'Type', 'Multi-Object', 'Object-Id', 'Method' ):
@@ -170,7 +183,7 @@ class CInP():
       try:
         message = data[ 'message' ]
       except ( KeyError, ValueError, TypeError ):
-        message = buff[ 0:100 ]
+        message = buff[ 0:200 ]
 
       logging.warning( 'cinp: Invalid Request "{0}"'.format( message ) )
       raise InvalidRequest( message )
@@ -198,7 +211,7 @@ class CInP():
             message = data
 
       else:
-        message = 'Server Error: "{0}"'.format( buff[ 0:100 ] )
+        message = 'Server Error: "{0}"'.format( buff[ 0:200 ] )
 
       logging.error( 'cinp: {0}'.format( message ) )
       raise ServerError( message )
@@ -376,10 +389,20 @@ class CInP():
     """
     returns a generator that will iterate over the uri/id_list, reterieving from the server in chunk_size blocks
     each item is ( rec_id, rec_values )
+    if uri is a list, id_list is ignored
     """
-    ( namespace, model, _, tmp_id_list, _ ) = self.uri.split( uri )
-    if id_list is None:
-      id_list = tmp_id_list
+    if isinstance( uri, list ):
+      id_list = []
+      for item in uri:
+        ( _, _, _, tmp_id_list, _ ) = self.uri.split( item )
+        id_list += tmp_id_list
+
+      ( namespace, model, _, tmp_id_list, _ ) = self.uri.split( uri[0] )
+
+    else:
+      ( namespace, model, _, tmp_id_list, _ ) = self.uri.split( uri )
+      if id_list is None:
+        id_list = tmp_id_list
 
     result_list = []
     pos = 0
@@ -401,4 +424,156 @@ class CInP():
       id_list = self.uri.extractIds( tmp_id_list )
       pos = count_map[ 'position' ] + count_map[ 'count' ]
       total = count_map[ 'total' ]
-      return self.getMulti( uri, id_list, get_chunk_size )
+      return self.getMulti( uri, id_list, get_chunk_size )  # TODO: need to found out how to get the next chunk, return/yeild something
+
+  def getFilteredURIs( self, uri, filter_name=None, filter_value_map=None, list_chunk_size=100, get_chunk_size=10, timeout=30 ):
+    pos = 0
+    total = 1
+    while pos < total:
+      ( tmp_id_list, count_map ) = self.list( uri, filter_name=filter_name, filter_value_map=filter_value_map, position=pos, count=list_chunk_size )
+      id_list = self.uri.extractIds( tmp_id_list )
+      pos = count_map[ 'position' ] + count_map[ 'count' ]
+      total = count_map[ 'total' ]
+
+      while len( id_list ) > 0:
+        yield id_list.pop( 0 )
+
+  def getFile( self, uri, target_dir='/tmp', file_object=None, cb=None, timeout=30, chunk_size=( 4096 * 1024 ) ):
+    """
+    if file_object is defined:
+       The file contense are written to it and the filename as specified by the
+       server is returned, None is returned if not filename is detected.  The
+       file_object is not closed. file_object must be opened with the 'b' attribute.
+
+    Otherwise a file is created in target_dir, and the full path is returned.  If the
+      filename is not specified by the server, and a random filename is chosen.
+      WARNING: there no checking done to make sure the target file does not allready
+      exist, there is a possibility it could clober something that allready exists.
+      we do make sure the filename fits a regex pattern that prevents it from escaping
+      the target_dir.  The "filename" as sent by the server is the "model" of the uri.
+      make sure target_dir exists before calling getFile
+    """
+
+    uri_parser = URI( '/' )
+    try:  # TODO: There has to be a better way to validate this uri
+      ( _, filename, _, _, _ ) = uri_parser.split( uri )
+    except ValueError as e:
+      raise InvalidRequest( str( e ) )
+
+    # Due to the return value we have to do our own request, this is pretty much a stright GET
+    url = '{0}:{1}{2}'.format( self.host, self.port, uri )
+    req = request.Request( url )
+    req.get_method = lambda: 'GET'
+    try:
+      resp = self.opener.open( req, timeout=timeout )
+
+    except request.HTTPError as e:
+      raise ResponseError( 'HTTPError "{0}"'.format( e ) )
+
+    except request.URLError as e:
+      if isinstance( e.reason, socket.timeout ):
+        raise Timeout( 'Request Timeout after {0} seconds'.format( timeout ) )
+
+      raise ResponseError( 'URLError "{0}" for "{1}" via "{2}"'.format( e, url, self.proxy ) )
+
+    http_code = resp.code
+    if http_code != 200:
+      logging.warning( 'cinp: unexpected HTTP Code "{0}" for File Get'.format( http_code ) )
+      raise ResponseError( 'Unexpected HTTP Code "{0}" for File Get'.format( http_code ) )
+
+    try:
+      size = resp.headers[ 'Content-Length' ]
+    except KeyError:
+      size = 0
+
+    if file_object is not None:
+      file_writer = file_object
+
+    else:
+      if filename is None:
+        file_writer = NamedTemporaryFile( dir=target_dir, mode='wb' )
+        filename = file_writer.name
+
+      else:
+        filename = os.path.join( target_dir, filename )
+        file_writer = open( filename, 'wb' )
+
+    buff = resp.read( chunk_size )
+    while buff:
+      file_writer.write( buff )
+      if cb:
+        cb( file_writer.tell(), size )
+      buff = resp.read( chunk_size )
+
+    resp.close()
+
+    if file_object is not None:
+      return filename
+
+    else:
+      file_writer.close()
+      return filename
+
+  def uploadFile( self, uri, filepath, filename=None, cb=None, timeout=30 ):
+    """
+    filepath can be a string of the path name or a file object.  If a file object
+    either specify the filename or make sure your file object exposes the attribute
+    'name'.  Also if file object, must be opened in binary mode, ie: 'rb'
+
+    NOTE: this is not a CInP function, but a conviance function for uploading large files.
+    """
+    uri_parser = URI( '/' )
+    try:  # TODO: There has to be a better way to validate this uri
+      ( namespace, model, action, id_list, _ ) = uri_parser.split( uri )
+    except ValueError as e:
+      raise InvalidRequest( str( e ) )
+
+    if action is not None or id_list is not None:
+      raise InvalidRequest( 'file upload target can\'t be an action nor have ids' )
+
+    if isinstance( filepath, str ):
+      if filename is None:
+        filename = os.path.basename( filepath )
+
+      file_reader = _readerWrapper( open( filepath, 'rb' ), cb )
+
+    else:
+      if filename is None:
+        filename = os.path.basename( filepath.name )
+
+      file_reader = _readerWrapper( filepath, cb )
+
+    header_map = {
+                   'Content-Disposition': 'inline: filename="{0}"'.format( filename )
+                 }
+
+    ( http_code, data, _ ) = self._request( 'UPLOAD', uri_parser.build( namespace, model ), data=file_reader, header_map=header_map, timeout=timeout )
+
+    if http_code != 202:
+      logging.warning( 'cinp: unexpected HTTP Code "{0}" for File Upload'.format( http_code ) )
+      raise ResponseError( 'Unexpected HTTP Code "{0}" for File Upload'.format( http_code ) )
+
+    return data[ 'uri' ]
+
+
+class _readerWrapper():
+  def __init__( self, reader, cb ):
+    self._cb = cb
+    self._size = os.fstat( reader.fileno() ).st_size
+    self._reader = reader
+
+  def __len__( self ):
+    return self._size
+
+  def read( self, size ):
+    if self._cb:
+      self._cb( self._reader.tell(), self._size )
+    buff = self._reader.read( size )
+    return buff
+
+
+def JSONDefault( obj ):
+   if isinstance( obj, datetime ):
+     return obj.isoformat()
+
+   return json.JSONEncoder.default( obj )

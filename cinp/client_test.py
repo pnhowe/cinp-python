@@ -313,7 +313,7 @@ def test_request( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:123:'
   assert req.data == b''
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
   assert code == 200
   assert data is None
@@ -324,7 +324,7 @@ def test_request( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:123:'
   assert req.data == b'{"myval": 234}'
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'UPDATE'
   assert code == 200
   assert data is None
@@ -335,7 +335,7 @@ def test_request( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model'
   assert req.data == b'{"myval": "me"}'
-  assert req.headers == { 'Pos': 123 }
+  assert req.headers == { 'Pos': 123, 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'LIST'
   assert code == 200
   assert data is None
@@ -392,7 +392,7 @@ def test_request( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:123:'
   assert req.data == b''
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
   assert code == 200
   assert data == { 'My thing': 'the value' }
@@ -404,7 +404,7 @@ def test_request( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:123:'
   assert req.data == b''
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
   assert code == 200
   assert data is None
@@ -416,7 +416,7 @@ def test_request( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:123:'
   assert req.data == b''
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
   assert code == 200
   assert data is None
@@ -429,7 +429,7 @@ def test_request( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://bob.com:70/theapi/model:123:'
   assert req.data == b''
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
   assert code == 200
   assert data is None
@@ -452,7 +452,7 @@ def test_get( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:123:'
   assert req.data == b''
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
   assert rec_values == { 'key': 'value', 'thing': 'stuff' }
 
@@ -477,7 +477,7 @@ def test_get( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:123:'
   assert req.data == b''
-  assert req.headers == { 'Multi-object': True }
+  assert req.headers == { 'Multi-object': True, 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
   assert rec_values == { 'key': 'value', 'thing': 'stuff' }
 
@@ -498,7 +498,7 @@ def test_list( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model'
   assert req.data == b'{}'
-  assert req.headers == { 'Position': '0', 'Count': '10' }
+  assert req.headers == { 'Position': '0', 'Count': '10', 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'LIST'
   assert items == [ '/api/v1/model:123:', '/api/v1/model:124:' ]
   assert count_map == { 'position': 0, 'count': 2, 'total': 20 }
@@ -508,7 +508,7 @@ def test_list( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model'
   assert req.data == b'{}'
-  assert req.headers == { 'Position': '20', 'Count': '5' }
+  assert req.headers == { 'Position': '20', 'Count': '5', 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'LIST'
   assert items == [ '/api/v1/model:123:', '/api/v1/model:124:' ]
   assert count_map == { 'position': 0, 'count': 2, 'total': 20 }
@@ -518,7 +518,7 @@ def test_list( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model'
   assert req.data == b'{"sort_by": "age"}'
-  assert req.headers == { 'Filter': 'alpha', 'Position': '0', 'Count': '10' }
+  assert req.headers == { 'Filter': 'alpha', 'Position': '0', 'Count': '10', 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'LIST'
   assert items == [ '/api/v1/model:123:', '/api/v1/model:124:' ]
   assert count_map == { 'position': 0, 'count': 2, 'total': 20 }
@@ -559,7 +559,7 @@ def test_list( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model'
   assert req.data == b'{}'
-  assert req.headers == { 'Position': '0', 'Count': '10' }
+  assert req.headers == { 'Position': '0', 'Count': '10', 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'LIST'
   assert items == [ '/api/v1/model:123:', '/api/v1/model:124:' ]
   assert count_map == { 'position': 0, 'count': 0, 'total': 0 }
@@ -570,7 +570,7 @@ def test_list( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model'
   assert req.data == b'{}'
-  assert req.headers == { 'Position': '0', 'Count': '10' }
+  assert req.headers == { 'Position': '0', 'Count': '10', 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'LIST'
   assert items == [ '/api/v1/model:123:', '/api/v1/model:124:' ]
   assert count_map == { 'position': 0, 'count': 0, 'total': 0 }
@@ -595,7 +595,7 @@ def test_create( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model'
   assert req.data == b'{}'
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'CREATE'
   assert rec_values == ( 'test', { 'asdf': 'erere' } )
 
@@ -604,7 +604,7 @@ def test_create( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model'
   assert req.data == b'{"asdf": "xcv"}'
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'CREATE'
   assert rec_values == ( 'test', { 'asdf': 'erere' } )
 
@@ -642,7 +642,7 @@ def test_update( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:asdf:'
   assert req.data == b'{"asdf": "xcv"}'
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'UPDATE'
   assert rec_values == { 'hi': 'there' }
 
@@ -651,7 +651,7 @@ def test_update( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:asdf:123:'
   assert req.data == b'{"asdf": "xcv"}'
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'UPDATE'
   assert rec_values == { 'hi': 'there' }
 
@@ -692,7 +692,7 @@ def test_delete( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:123:'
   assert req.data == b''
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'DELETE'
   assert result is True
 
@@ -701,7 +701,7 @@ def test_delete( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:123:asdf:'
   assert req.data == b''
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'DELETE'
   assert result is True
 
@@ -738,7 +738,7 @@ def test_call( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model(myfunc)'
   assert req.data == b'{}'
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'CALL'
   assert return_value == {}
 
@@ -747,7 +747,7 @@ def test_call( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:234:(myfunc)'
   assert req.data == b'{}'
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'CALL'
   assert return_value == {}
 
@@ -756,7 +756,7 @@ def test_call( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model:234:sdf:(myfunc)'
   assert req.data == b'{}'
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'CALL'
   assert return_value == {}
 
@@ -765,7 +765,7 @@ def test_call( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model(myfunc)'
   assert req.data == b'{"arg1": 12}'
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'CALL'
   assert return_value == {}
 
@@ -775,7 +775,7 @@ def test_call( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model(myfunc)'
   assert req.data == b'{}'
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'CALL'
   assert return_value == 'The Value'
 
@@ -785,7 +785,7 @@ def test_call( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model(myfunc)'
   assert req.data == b'{}'
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'CALL'
   assert return_value == { 'stuff': 'nice' }
 
@@ -813,7 +813,7 @@ def test_describe( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/'
   assert req.data == b''
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'DESCRIBE'
   assert data is None
 
@@ -822,7 +822,7 @@ def test_describe( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model'
   assert req.data == b''
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'DESCRIBE'
   assert data is None
 
@@ -831,7 +831,7 @@ def test_describe( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model(sdf)'
   assert req.data == b''
-  assert req.headers == {}
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'DESCRIBE'
   assert data is None
 
@@ -860,7 +860,7 @@ def test_get_multi( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/ns/model:asd:efe:'
   assert req.data == b''
-  assert req.headers == { 'Multi-object': True }
+  assert req.headers == { 'Multi-object': True, 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
 
   mocked_open.reset_mock()
@@ -871,7 +871,7 @@ def test_get_multi( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/ns/model:asd:efe:'
   assert req.data == b''
-  assert req.headers == { 'Multi-object': True }
+  assert req.headers == { 'Multi-object': True, 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
 
   mocked_open.reset_mock()
@@ -882,7 +882,7 @@ def test_get_multi( mocker ):
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/ns/model:asd:efe:'
   assert req.data == b''
-  assert req.headers == { 'Multi-object': True }
+  assert req.headers == { 'Multi-object': True, 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
 
   mocked_open.reset_mock()
@@ -893,12 +893,12 @@ def test_get_multi( mocker ):
   req = mocked_open.call_args_list[0][0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/ns/model:asd:efe:'
   assert req.data == b''
-  assert req.headers == { 'Multi-object': True }
+  assert req.headers == { 'Multi-object': True, 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
   req = mocked_open.call_args_list[1][0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/ns/model:qwe:123:'
   assert req.data == b''
-  assert req.headers == { 'Multi-object': True }
+  assert req.headers == { 'Multi-object': True, 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
 
 
@@ -912,7 +912,7 @@ def test_get_filtered_objects( mocker ):
   assert mocked_open.call_count == 1
   assert req.full_url == 'http://localhost:8080/api/v1/ns/model'
   assert req.data == b'{}'
-  assert req.headers == { 'Count': '100', 'Position': '0' }
+  assert req.headers == { 'Count': '100', 'Position': '0', 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'LIST'
   mocked_open.return_value = MockResponse( 200, {}, '{"/api/v1/ns/model:asd:":{"key1":"value1"},"/api/v1/ns/model:efe:":{"key2":"value2"}}' )
   assert sorted( list( gen ) ) == sorted( [ ( '/api/v1/ns/model:asd:', { 'key1': 'value1' } ), ( '/api/v1/ns/model:efe:', { 'key2': 'value2' } ) ] )
@@ -920,7 +920,7 @@ def test_get_filtered_objects( mocker ):
   assert mocked_open.call_count == 2
   assert req.full_url == 'http://localhost:8080/api/v1/ns/model:asd:efe:'
   assert req.data == b''
-  assert req.headers == { 'Multi-object': True }
+  assert req.headers == { 'Multi-object': True, 'Content-type': 'application/json;charset=utf-8' }
   assert req.get_method() == 'GET'
 
 

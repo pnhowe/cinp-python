@@ -2,27 +2,28 @@ import pytest
 
 from cinp.common import URI
 
-#TODO: test mutli-object setting
+# TODO: test mutli-object setting
 
-def test_splituri_builduri(): #TODO: test invlid URIs, mabey remove some tests from client_test that are just checking the URI
+
+def test_splituri_builduri():  # TODO: test invlid URIs, mabey remove some tests from client_test that are just checking the URI
   uri = URI( '/api/v1/' )
 
   ( ns, model, action, id_list, multi ) = uri.split( '/api/v1/' )
   assert ns == []
-  assert model == None
-  assert id_list == None
-  assert action == None
-  assert multi == False
+  assert model is None
+  assert id_list is None
+  assert action is None
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/'
   ns = None
   assert uri.build( ns, model, action, id_list ) == '/api/v1/'
 
   ( ns, model, action, id_list, multi ) = uri.split( '/api/v1/ns/' )
   assert ns == [ 'ns' ]
-  assert model == None
-  assert id_list == None
-  assert action == None
-  assert multi == False
+  assert model is None
+  assert id_list is None
+  assert action is None
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/'
   ns = 'ns'
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/'
@@ -30,35 +31,35 @@ def test_splituri_builduri(): #TODO: test invlid URIs, mabey remove some tests f
   ( ns, model, action, id_list, multi ) = uri.split( '/api/v1/ns/model' )
   assert ns == [ 'ns' ]
   assert model == 'model'
-  assert id_list == None
-  assert action == None
-  assert multi == False
+  assert id_list is None
+  assert action is None
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/model'
   id_list = []
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/model'
 
   ( ns, model, action, id_list, multi ) = uri.split( '/api/v1/ns/ns2/' )
   assert ns == [ 'ns', 'ns2' ]
-  assert model == None
-  assert id_list == None
-  assert action == None
-  assert multi == False
+  assert model is None
+  assert id_list is None
+  assert action is None
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/ns2/'
 
   ( ns, model, action, id_list, multi ) = uri.split( '/api/v1/ns/ns2/model' )
   assert ns == [ 'ns', 'ns2' ]
   assert model == 'model'
-  assert id_list == None
-  assert action == None
-  assert multi == False
+  assert id_list is None
+  assert action is None
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/ns2/model'
 
   ( ns, model, action, id_list, multi ) = uri.split( '/api/v1/ns/model::' )
   assert ns == [ 'ns' ]
   assert model == 'model'
   assert id_list == [ '' ]
-  assert action == None
-  assert multi == False
+  assert action is None
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/model::'
   id_list = ''
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/model::'
@@ -67,8 +68,8 @@ def test_splituri_builduri(): #TODO: test invlid URIs, mabey remove some tests f
   assert ns == [ 'ns' ]
   assert model == 'model'
   assert id_list == [ 'ghj' ]
-  assert action == None
-  assert multi == False
+  assert action is None
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/model:ghj:'
   id_list = 'ghj'
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/model:ghj:'
@@ -77,16 +78,16 @@ def test_splituri_builduri(): #TODO: test invlid URIs, mabey remove some tests f
   assert ns == [ 'ns' ]
   assert model == 'model'
   assert id_list == [ 'ghj', 'dsf', 'sfe' ]
-  assert action == None
-  assert multi == True
+  assert action is None
+  assert multi is True
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/model:ghj:dsf:sfe:'
 
   ( ns, model, action, id_list, multi ) = uri.split( '/api/v1/ns/model(action)' )
   assert ns == [ 'ns' ]
   assert model == 'model'
-  assert id_list == None
+  assert id_list is None
   assert action == 'action'
-  assert multi == False
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/model(action)'
 
   ( ns, model, action, id_list, multi ) = uri.split( '/api/v1/ns/model:sdf:(action)' )
@@ -94,7 +95,7 @@ def test_splituri_builduri(): #TODO: test invlid URIs, mabey remove some tests f
   assert model == 'model'
   assert id_list == [ 'sdf' ]
   assert action == 'action'
-  assert multi == False
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/model:sdf:(action)'
 
   ( ns, model, action, id_list, multi ) = uri.split( '/api/v1/ns/model:sdf:eed:(action)' )
@@ -102,15 +103,15 @@ def test_splituri_builduri(): #TODO: test invlid URIs, mabey remove some tests f
   assert model == 'model'
   assert id_list == [ 'sdf', 'eed' ]
   assert action == 'action'
-  assert multi == True
+  assert multi is True
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/model:sdf:eed:(action)'
 
   ( ns, model, action, id_list, multi ) = uri.split( '/api/v1/', root_optional=True )
   assert ns == []
-  assert model == None
-  assert id_list == None
-  assert action == None
-  assert multi == False
+  assert model is None
+  assert id_list is None
+  assert action is None
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/'
   assert uri.build( ns, model, action, id_list, in_root=False ) == '/'
 
@@ -118,19 +119,19 @@ def test_splituri_builduri(): #TODO: test invlid URIs, mabey remove some tests f
     ( ns, model, action, id_list, multi ) = uri.split( '/', root_optional=False )
   ( ns, model, action, id_list, multi ) = uri.split( '/', root_optional=True )
   assert ns == []
-  assert model == None
-  assert id_list == None
-  assert action == None
-  assert multi == False
+  assert model is None
+  assert id_list is None
+  assert action is None
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/'
   assert uri.build( ns, model, action, id_list, in_root=False ) == '/'
 
   ( ns, model, action, id_list, multi ) = uri.split( '/api/v1/ns/', root_optional=True )
   assert ns == [ 'ns' ]
-  assert model == None
-  assert id_list == None
-  assert action == None
-  assert multi == False
+  assert model is None
+  assert id_list is None
+  assert action is None
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/'
   assert uri.build( ns, model, action, id_list, in_root=False ) == '/ns/'
 
@@ -138,10 +139,10 @@ def test_splituri_builduri(): #TODO: test invlid URIs, mabey remove some tests f
     ( ns, model, action, id_list, multi ) = uri.split( '/ns/', root_optional=False )
   ( ns, model, action, id_list, multi ) = uri.split( '/ns/', root_optional=True )
   assert ns == [ 'ns' ]
-  assert model == None
-  assert id_list == None
-  assert action == None
-  assert multi == False
+  assert model is None
+  assert id_list is None
+  assert action is None
+  assert multi is False
   assert uri.build( ns, model, action, id_list ) == '/api/v1/ns/'
   assert uri.build( ns, model, action, id_list, in_root=False ) == '/ns/'
 

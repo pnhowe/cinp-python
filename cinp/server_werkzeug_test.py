@@ -100,7 +100,7 @@ def test_werkzeug_response():
 
 def test_werkzeug_server():
   server = WerkzeugServer( root_path='/api/', root_version='0.0', debug=True, get_user=lambda id, token: 'Bob' )
-  ns = Namespace( name='ns1', version='0.1' )
+  ns = Namespace( name='ns1', version='0.1', converter=None )
   ns.addElement( Model( name='model1', field_list=[], transaction_class=None ) )
   server.registerNamespace( '/', ns )
 
