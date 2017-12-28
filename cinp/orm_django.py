@@ -183,7 +183,7 @@ class DjangoCInP():
     return namespace
 
   # decorators
-  def model( self, hide_field_list=None, property_list=None, constant_list=None, not_allowed_method_list=None, read_only_list=None, cache_length=3600 ):
+  def model( self, hide_field_list=None, property_list=None, constant_set_map=None, not_allowed_method_list=None, read_only_list=None, cache_length=3600 ):
     def decorator( cls ):
       global __MODEL_REGISTRY__
 
@@ -291,7 +291,7 @@ class DjangoCInP():
       except AttributeError:
         doc = None
 
-      model = Model( name=name, doc=doc, transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_list=constant_list, not_allowed_method_list=not_allowed_method_list )
+      model = Model( name=name, doc=doc, transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_set_map=constant_set_map, not_allowed_method_list=not_allowed_method_list )
       model._django_model = cls
       model._django_filter_funcs_map = filter_funcs_map
       self.model_list.append( model )
@@ -306,7 +306,7 @@ class DjangoCInP():
       name = cls.__qualname__
       not_allowed_method_list_ = list( set( [ 'LIST', 'GET', 'CREATE', 'UPDATE', 'DELETE' ] ).union( set( not_allowed_method_list or [] ) ) )
 
-      model = Model( name=name, transaction_class=DjangoTransaction, field_list=[], list_filter_map={}, constant_list=[], not_allowed_method_list=not_allowed_method_list_ )
+      model = Model( name=name, transaction_class=DjangoTransaction, field_list=[], list_filter_map={}, constant_set_map={}, not_allowed_method_list=not_allowed_method_list_ )
       self.model_list.append( model )
       return cls
 

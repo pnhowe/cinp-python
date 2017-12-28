@@ -233,10 +233,10 @@ def test_model():
 
   model1 = Model( name='model1', transaction_class=TestTransaction, field_list=[] )
   assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( model1.describe().data ) == { 'name': 'model1', 'path': None, 'fields': [], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( model1.describe().data ) == { 'name': 'model1', 'path': None, 'fields': [], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
   ns.addElement( model1 )
   assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1' ], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( model1.describe().data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( model1.describe().data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
 
   field_list = []
   field_list.append( Field( name='field1', type='String', length=50 ) )
@@ -244,12 +244,12 @@ def test_model():
 
   model2 = Model( name='model2', transaction_class=TestTransaction, field_list=field_list )
   assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1' ], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( model1.describe().data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] }
-  assert sort_dsc( model2.describe().data ) == { 'name': 'model2', 'path': None, 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True, }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( model1.describe().data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( model2.describe().data ) == { 'name': 'model2', 'path': None, 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True, }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
   ns.addElement( model2 )
   assert sort_dsc( ns.describe().data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1', '/api/model2' ], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( model1.describe().data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] }
-  assert sort_dsc( model2.describe().data ) == { 'name': 'model2', 'path': '/api/model2', 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( model1.describe().data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( model2.describe().data ) == { 'name': 'model2', 'path': '/api/model2', 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
 
   assert model2.describe().header_map == { 'Cache-Control': 'max-age=0', 'Method': 'DESCRIBE', 'Type': 'Model' }
 
@@ -645,7 +645,7 @@ def test_server():
   assert res.header_map == { 'Type': 'Namespace', 'Method': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '0.9' }
 
   path = '/api/ns1/model1'
-  desc_ref = sort_dsc( { 'name': 'model1', 'path': '/api/ns1/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': [], 'list-filters': {}, 'not-allowed-metods': [] } )
+  desc_ref = sort_dsc( { 'name': 'model1', 'path': '/api/ns1/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] } )
   assert sort_dsc( server.root_namespace.getElement( server.uri.split( path ) ).describe().data ) == desc_ref
   req = Request( 'DESCRIBE', path, { 'CINP-VERSION': __CINP_VERSION__ } )
   res = server.handle( req )
