@@ -37,10 +37,10 @@ def test_werkzeug_request():
           'wsgi.input': FakeBody( '"test"' )
         }
   req = WerkzeugRequest( env )
-  assert req.method == 'GET'
+  assert req.verb == 'GET'
   assert req.uri == '/api/'
   assert req.header_map == {}
-  assert req.data == 'test'
+  assert req.data is None  # no content type the wsgi.input should be ignored
 
   env = {
           'SERVER_PROTOCOL': 'HTTP/1.1',
@@ -57,7 +57,7 @@ def test_werkzeug_request():
           'SCRIPT_NAME': '',
           'REMOTE_ADDR': '127.0.0.1',
           'REQUEST_METHOD': 'DELETE',
-          'CONTENT_TYPE': 'text/json',
+          'CONTENT_TYPE': 'application/json;charset=utf-8',
           'HTTP_CINP_VERSION': '0.9',
           'HTTP_CONNECTION': 'keep-alive',
           'HTTP_POSITION': 50,
@@ -68,9 +68,9 @@ def test_werkzeug_request():
           'wsgi.input': FakeBody( '{ "this": "works" }' )
         }
   req = WerkzeugRequest( env )
-  assert req.method == 'DELETE'
+  assert req.verb == 'DELETE'
   assert req.uri == '/api/ns/model:key:'
-  assert req.header_map == { 'CINP-VERSION': '0.9', 'CONTENT-TYPE': 'text/json', 'FILTER': 'curent', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'kd8dkv&TTIv893ink', 'POSITION': '50', 'COUNT': '34', 'MULTI-OBJECT': 'True' }
+  assert req.header_map == { 'CINP-VERSION': '0.9', 'CONTENT-TYPE': 'application/json;charset=utf-8', 'FILTER': 'curent', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'kd8dkv&TTIv893ink', 'POSITION': '50', 'COUNT': '34', 'MULTI-OBJECT': 'True' }
   assert req.data == { 'this': 'works' }
 
 
@@ -114,5 +114,5 @@ def test_werkzeug_server():
         }
   wresp = server.handle( env )
   assert wresp.status_code == 200
-  assert wresp.headers == Headers( [ ( 'Cache-Control', 'max-age=0' ), ( 'Cinp-Version', '0.9' ), ( 'Content-Type', 'application/json;charset=utf-8' ), ( 'Content-Length', '131' ), ( 'Method', 'DESCRIBE' ), ( 'Type', 'Namespace' ) ] )
+  assert wresp.headers == Headers( [ ( 'Cache-Control', 'max-age=0' ), ( 'Cinp-Version', '0.9' ), ( 'Content-Type', 'application/json;charset=utf-8' ), ( 'Content-Length', '131' ), ( 'Verb', 'DESCRIBE' ), ( 'Type', 'Namespace' ) ] )
   assert json.loads( str( wresp.data, 'utf-8' ) ) == { 'multi-uri-max': 100, 'api-version': '0.0', 'path': '/api/', 'doc': '', 'namespaces': [ '/api/ns1/' ], 'models': [], 'name': 'root' }

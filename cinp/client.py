@@ -77,11 +77,11 @@ class CInP():
                                 ( 'CInP-Version', __CINP_VERSION__ )
                               ]
 
-  def _checkRequest( self, method, uri, data ):  # TODO: also check if method is allowed to have headers ( other than thoes provided by the opener ), also check to make sure they are valid heaaders
-    logging.debug( 'cinp: check "{0}" to "{1}"'.format( method, uri ) )
+  def _checkRequest( self, verb, uri, data ):  # TODO: also check if verb is allowed to have headers ( other than thoes provided by the opener ), also check to make sure they are valid heaaders
+    logging.debug( 'cinp: check "{0}" to "{1}"'.format( verb, uri ) )
 
-    if method not in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL', 'DESCRIBE' ):
-      raise InvalidRequest( 'Invalid HTTP Method "{0}"'.format( method ) )
+    if verb not in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL', 'DESCRIBE' ):
+      raise InvalidRequest( 'Invalid Verb (HTTP Method) "{0}"'.format( verb ) )
 
     if data is not None and not isinstance( data, dict ):
       raise InvalidRequest( 'Data must be a dict' )
@@ -94,41 +94,41 @@ class CInP():
     if id_list == []:
       id_list = None
 
-    if action is not None and method not in ( 'CALL', 'DESCRIBE' ):
-      raise InvalidRequest( 'Invalid method "{0}" for request with action'.format( method ) )
+    if action is not None and verb not in ( 'CALL', 'DESCRIBE' ):
+      raise InvalidRequest( 'Invalid verb "{0}" for request with action'.format( verb ) )
 
-    if method in ( 'CALL', ) and action is None:
-      raise InvalidRequest( 'Method "{0}" requires action'.format( method ) )
+    if verb in ( 'CALL', ) and action is None:
+      raise InvalidRequest( 'Verb "{0}" requires action'.format( verb ) )
 
-    if id_list is not None and method not in ( 'GET', 'UPDATE', 'DELETE', 'CALL' ):
-      raise InvalidRequest( 'Invalid method "{0}" for request with id'.format( method ) )
+    if id_list is not None and verb not in ( 'GET', 'UPDATE', 'DELETE', 'CALL' ):
+      raise InvalidRequest( 'Invalid verb "{0}" for request with id'.format( verb ) )
 
-    if method in ( 'GET', 'UPDATE', 'DELETE' ) and id_list is None:
-      raise InvalidRequest( 'Method "{0}" requires id'.format( method ) )
+    if verb in ( 'GET', 'UPDATE', 'DELETE' ) and id_list is None:
+      raise InvalidRequest( 'verb "{0}" requires id'.format( verb ) )
 
-    if data is not None and method not in ( 'LIST', 'UPDATE', 'CREATE', 'CALL' ):
-      raise InvalidRequest( 'Invalid method "{0}" for request with data'.format( method ) )
+    if data is not None and verb not in ( 'LIST', 'UPDATE', 'CREATE', 'CALL' ):
+      raise InvalidRequest( 'Invalid verb "{0}" for request with data'.format( verb ) )
 
-    if method in ( 'UPDATE', 'CREATE' ) and data is None:
-      raise InvalidRequest( 'Method "{0}" requires data'.format( method ) )
+    if verb in ( 'UPDATE', 'CREATE' ) and data is None:
+      raise InvalidRequest( 'Verb "{0}" requires data'.format( verb ) )
 
-    if method in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL' ) and not model:
-      raise InvalidRequest( 'Method "{0}" requires model'.format( method ) )
+    if verb in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL' ) and not model:
+      raise InvalidRequest( 'Verb "{0}" requires model'.format( verb ) )
 
-  def _request( self, method, uri, data=None, header_map=None, timeout=30 ):
-    logging.debug( 'cinp: making "{0}" request to "{1}"'.format( method, uri ) )
+  def _request( self, verb, uri, data=None, header_map=None, timeout=30 ):
+    logging.debug( 'cinp: making "{0}" request to "{1}"'.format( verb, uri ) )
     if header_map is None:
       header_map = {}
 
-    if method == 'UPLOAD':  # not a CINP method, just using it to bypass some checking here in _request
+    if verb == 'UPLOAD':  # not a CINP verb, just using it to bypass some checking here in _request
       header_map[ 'Content-Type' ] = 'application/octet-stream'
       if not hasattr( data, 'read' ):
         raise InvalidRequest( 'data must be an readable stream' )
-      method = 'POST'  # not to be handled by CInP on the other end, but by a bolt on file upload handler
+      verb = 'POST'  # not to be handled by CInP on the other end, but by a bolt on file upload handler
 
     else:
       header_map[ 'Content-Type' ] = 'application/json;charset=utf-8'
-      self._checkRequest( method, uri, data )
+      self._checkRequest( verb, uri, data )
       if data is None:
         data = ''.encode( 'utf-8' )
       else:
@@ -136,7 +136,7 @@ class CInP():
 
     url = '{0}:{1}{2}'.format( self.host, self.port, uri )
     req = request.Request( url, data=data, headers=header_map )
-    req.get_method = lambda: method
+    req.get_method = lambda: verb
     try:
       resp = self.opener.open( req, timeout=timeout )
 
@@ -171,7 +171,7 @@ class CInP():
           raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
 
     header_map = {}
-    for item in ( 'Position', 'Count', 'Total', 'Type', 'Multi-Object', 'Object-Id', 'Method' ):
+    for item in ( 'Position', 'Count', 'Total', 'Type', 'Multi-Object', 'Object-Id', 'verb' ):
       try:
         header_map[ item ] = resp.headers[ item ]
       except KeyError:
