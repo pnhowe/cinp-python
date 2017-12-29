@@ -625,6 +625,12 @@ class Model( Element ):
     if data is not None and not isinstance( data, dict ):
       raise InvalidRequest( 'LIST data must be a dict or None' )
 
+    id_only = header_map.get( 'ID-ONLY', None )
+    if id_only is not None:
+      id_only = id_only.upper() == 'TRUE'
+    else:
+      id_only = False
+
     filter_name = header_map.get( 'FILTER', None )
     try:
       count = int( header_map.get( 'COUNT', 10 ) )
@@ -667,7 +673,12 @@ class Model( Element ):
       raise ServerError( 'List result is not a valid tuple' )
 
     ( id_list, position, total ) = result
-    return Response( 200, data=[ '{0}:{1}:'.format( self.path, item ) for item in id_list ], header_map={ 'Verb': 'LIST', 'Cache-Control': 'no-cache', 'Count': str( len( id_list ) ), 'Position': str( position ), 'Total': str( total ) } )
+    if id_only is True:
+      id_list = [ '{0}'.format( item ) for item in id_list ]
+    else:
+      id_list = [ '{0}:{1}:'.format( self.path, item ) for item in id_list ]
+
+    return Response( 200, data=id_list, header_map={ 'Verb': 'LIST', 'Cache-Control': 'no-cache', 'Count': str( len( id_list ) ), 'Position': str( position ), 'Total': str( total ), 'Id-Only': str( id_only ) } )
 
   def create( self, converter, transaction, data ):
     if not isinstance( data, dict ):
@@ -1000,7 +1011,7 @@ class Server():
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
     if self.cors_allow_list is not None:
       response.header_map[ 'Access-Control-Allow-Origin' ] = ', '.join( self.cors_allow_list )
-      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id'  # TODO: probably should only list the ones actually sent
+      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id, Id-Only'  # TODO: probably should only list the ones actually sent
 
     return response
 
@@ -1026,7 +1037,7 @@ class Server():
       response = element.options()
       if self.cors_allow_list is not None:
         response.header_map[ 'Access-Control-Allow-Methods' ] = response.header_map[ 'Allow' ]
-        response.header_map[ 'Access-Control-Allow-Headers' ] = 'Accept, Cinp-Version, Auth-Id, Auth-Token, Filter, Content-Type, Count, Position, Multi-Object'
+        response.header_map[ 'Access-Control-Allow-Headers' ] = 'Accept, Cinp-Version, Auth-Id, Auth-Token, Filter, Content-Type, Count, Position, Multi-Object, Id-Only'
 
       return response
 
@@ -1151,7 +1162,7 @@ class Request():
     self.uri = uri  # make sure the query string/fragment/etc has allreay been stripped by the Child Class
     self.header_map = {}
     for name in header_map:
-      if name in ( 'CINP-VERSION', 'AUTH-ID', 'AUTH-TOKEN', 'CONTENT-TYPE', 'FILTER', 'POSITION', 'COUNT', 'MULTI-OBJECT' ):
+      if name in ( 'CINP-VERSION', 'AUTH-ID', 'AUTH-TOKEN', 'CONTENT-TYPE', 'FILTER', 'POSITION', 'COUNT', 'MULTI-OBJECT', 'ID-ONLY' ):
         self.header_map[ name ] = header_map[ name ]
 
     self.data = None
