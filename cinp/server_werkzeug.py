@@ -60,7 +60,7 @@ class WerkzeugRequest( Request ):
     for ( key, value ) in werkzeug_request.headers:
       header_map[ key.upper().replace( '_', '-' ) ] = value
 
-    super().__init__( method=werkzeug_request.method.upper(), uri=werkzeug_request.path, header_map=header_map, *args, **kwargs )
+    super().__init__( verb=werkzeug_request.method.upper(), uri=werkzeug_request.path, header_map=header_map, *args, **kwargs )
 
     content_type = self.header_map.get( 'CONTENT-TYPE', None )
     if content_type is not None:  # if it is none, there isn't (or shoudn't) be anthing to bring in anyway

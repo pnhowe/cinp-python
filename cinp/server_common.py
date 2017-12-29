@@ -430,7 +430,7 @@ class Element():
     raise InvalidRequest( 'Not OPTION able' )
 
   @staticmethod
-  def checkAuth( user, method, id_list ):
+  def checkAuth( user, verb, id_list ):
     raise ValueError( 'checkAuth not implemented' )
 
 
@@ -505,7 +505,7 @@ class Namespace( Element ):
 
     data[ 'namespaces' ] = namespace_list
     data[ 'models' ] = model_list
-    return Response( 200, data=data, header_map={ 'Method': 'DESCRIBE', 'Type': 'Namespace', 'Cache-Control': 'max-age=0' } )
+    return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Namespace', 'Cache-Control': 'max-age=0' } )
 
   def options( self ):
     header_map = {}
@@ -516,7 +516,7 @@ class Namespace( Element ):
 
 
 class Model( Element ):
-  def __init__( self, field_list, transaction_class, list_filter_map=None, constant_set_map=None, not_allowed_method_list=None, *args, **kwargs ):
+  def __init__( self, field_list, transaction_class, list_filter_map=None, constant_set_map=None, not_allowed_verb_list=None, *args, **kwargs ):
     super().__init__( *args, **kwargs )
     self.transaction_class = transaction_class
     self.field_map = {}
@@ -529,15 +529,15 @@ class Model( Element ):
     self.action_map = {}
     self.list_filter_map = list_filter_map or {}  # TODO: check list_filter_map  for  saninty, should  be [ filter_name ][ paramater_name ] = Paramater
     self.constant_set_map = constant_set_map or {}
-    self.not_allowed_method_list = []
-    for method in not_allowed_method_list or []:
-      if method == 'OPTIONS':
-        raise ValueError( 'Can not block OPTIONS method' )
+    self.not_allowed_verb_list = []
+    for verb in not_allowed_verb_list or []:
+      if verb == 'OPTIONS':
+        raise ValueError( 'Can not block OPTIONS verb' )
 
-      if method not in ( 'GET', 'LIST', 'CALL', 'CREATE', 'UPDATE', 'DELETE', 'DESCRIBE' ):
-        raise ValueError( 'Invalid blocked Method "{0}"'.format( method ) )
+      if verb not in ( 'GET', 'LIST', 'CALL', 'CREATE', 'UPDATE', 'DELETE', 'DESCRIBE' ):
+        raise ValueError( 'Invalid blocked verb "{0}"'.format( verb ) )
 
-      self.not_allowed_method_list.append( method )
+      self.not_allowed_verb_list.append( verb )
 
   @property
   def path( self ):
@@ -572,12 +572,12 @@ class Model( Element ):
       data[ 'constants' ][ name ] = self.constant_set_map[ name ]
     data[ 'fields' ] = [ item.describe() for item in self.field_map.values() ]
     data[ 'actions' ] = [ item.path for item in self.action_map.values() ]
-    data[ 'not-allowed-metods' ] = self.not_allowed_method_list
+    data[ 'not-allowed-metods' ] = self.not_allowed_verb_list
     data[ 'list-filters' ] = {}
     for name in self.list_filter_map:
       data[ 'list-filters' ][ name ] = [ item.describe() for item in self.list_filter_map[ name ].values() ]
 
-    return Response( 200, data=data, header_map={ 'Method': 'DESCRIBE', 'Type': 'Model', 'Cache-Control': 'max-age=0' } )
+    return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Model', 'Cache-Control': 'max-age=0' } )
 
   def options( self ):
     header_map = {}
@@ -619,11 +619,17 @@ class Model( Element ):
     else:
       result = self._asDict( converter, self._get( transaction, id_list[0] ) )
 
-    return Response( 200, data=result, header_map={ 'Method': 'GET', 'Cache-Control': 'no-cache', 'Multi-Object': str( multi ) } )
+    return Response( 200, data=result, header_map={ 'Verb': 'GET', 'Cache-Control': 'no-cache', 'Multi-Object': str( multi ) } )
 
   def list( self, converter, transaction, data, header_map ):
     if data is not None and not isinstance( data, dict ):
       raise InvalidRequest( 'LIST data must be a dict or None' )
+
+    id_only = header_map.get( 'ID-ONLY', None )
+    if id_only is not None:
+      id_only = id_only.upper() == 'TRUE'
+    else:
+      id_only = False
 
     filter_name = header_map.get( 'FILTER', None )
     try:
@@ -634,6 +640,9 @@ class Model( Element ):
     filter_values = {}
 
     if filter_name is not None:
+      if data is None:
+        raise InvalidRequest( 'Filter Paramaters are required when Filter Name is specified' )
+
       try:
         paramater_map = self.list_filter_map[ filter_name ]
       except KeyError:
@@ -664,7 +673,12 @@ class Model( Element ):
       raise ServerError( 'List result is not a valid tuple' )
 
     ( id_list, position, total ) = result
-    return Response( 200, data=[ '{0}:{1}:'.format( self.path, item ) for item in id_list ], header_map={ 'Method': 'LIST', 'Cache-Control': 'no-cache', 'Count': str( len( id_list ) ), 'Position': str( position ), 'Total': str( total ) } )
+    if id_only is True:
+      id_list = [ '{0}'.format( item ) for item in id_list ]
+    else:
+      id_list = [ '{0}:{1}:'.format( self.path, item ) for item in id_list ]
+
+    return Response( 200, data=id_list, header_map={ 'Verb': 'LIST', 'Cache-Control': 'no-cache', 'Count': str( len( id_list ) ), 'Position': str( position ), 'Total': str( total ), 'Id-Only': str( id_only ) } )
 
   def create( self, converter, transaction, data ):
     if not isinstance( data, dict ):
@@ -734,7 +748,7 @@ class Model( Element ):
     else:
       result = self._asDict( converter, result )
 
-    return Response( 201, data=result, header_map={ 'Method': 'CREATE', 'Cache-Control': 'no-cache', 'Object-Id': '{0}:{1}:'.format( self.path, object_id ) } )
+    return Response( 201, data=result, header_map={ 'Verb': 'CREATE', 'Cache-Control': 'no-cache', 'Object-Id': '{0}:{1}:'.format( self.path, object_id ) } )
 
   def _update( self, converter, transaction, object_id, value_map ):
     try:
@@ -789,14 +803,14 @@ class Model( Element ):
     else:
       result = self._update( converter, transaction, id_list[0], value_map )
 
-    return Response( 200, data=result, header_map={ 'Method': 'UPDATE', 'Cache-Control': 'no-cache', 'Multi-Object': str( multi ) } )
+    return Response( 200, data=result, header_map={ 'Verb': 'UPDATE', 'Cache-Control': 'no-cache', 'Multi-Object': str( multi ) } )
 
   def delete( self, transaction, id_list ):
     for object_id in id_list:
       if transaction.delete( self, object_id ) is False:
         raise ObjectNotFound( self.path, object_id )
 
-    return Response( 200, header_map={ 'Method': 'DELETE', 'Cache-Control': 'no-cache' } )
+    return Response( 200, header_map={ 'Verb': 'DELETE', 'Cache-Control': 'no-cache' } )
 
 
 class Action( Element ):
@@ -834,7 +848,7 @@ class Action( Element ):
     data = { 'name': self.name, 'path': self.path, 'doc': self.doc, 'return-type': return_type, 'static': self.static }
     data[ 'paramaters' ] = [ item.describe() for item in self.paramater_map.values() ]
 
-    return Response( 200, data=data, header_map={ 'Method': 'DESCRIBE', 'Type': 'Action', 'Cache-Control': 'max-age=0' } )
+    return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Action', 'Cache-Control': 'max-age=0' } )
 
   def call( self, converter, transaction, id_list, data, multi ):
     error_map = {}
@@ -874,7 +888,7 @@ class Action( Element ):
       except ValueError as e:
         raise InvalidRequest( 'Invalid Result Value: "{0}"'.format( str( e ) ) )
 
-    return Response( 200, data=result, header_map={ 'Method': 'CALL', 'Cache-Control': 'no-cache', 'Multi-Object': str( multi ) } )
+    return Response( 200, data=result, header_map={ 'Verb': 'CALL', 'Cache-Control': 'no-cache', 'Multi-Object': str( multi ) } )
 
   def options( self ):
     header_map = {}
@@ -889,7 +903,7 @@ class Server():
     self.uri = URI( root_path )
     self.debug = debug
     self.root_namespace = Namespace( name=None, version=root_version, root_path=root_path, converter=Converter( self.uri ) )
-    self.root_namespace.checkAuth = lambda user, method, id_list: True
+    self.root_namespace.checkAuth = lambda user, verb, id_list: True
     self.cors_allow_list = cors_allow_list
     self.path_handlers = {}
 
@@ -997,13 +1011,13 @@ class Server():
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
     if self.cors_allow_list is not None:
       response.header_map[ 'Access-Control-Allow-Origin' ] = ', '.join( self.cors_allow_list )
-      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id'  # TODO: probably should only list the ones actually sent
+      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id, Id-Only'  # TODO: probably should only list the ones actually sent
 
     return response
 
   def dispatch( self, request ):
-    if request.method not in ( 'GET', 'LIST', 'CALL', 'CREATE', 'UPDATE', 'DELETE', 'DESCRIBE', 'OPTIONS' ):
-      return Response( 400, data={ 'message': 'Invalid HTTP Method "{0}"'.format( request.method ) } )
+    if request.verb not in ( 'GET', 'LIST', 'CALL', 'CREATE', 'UPDATE', 'DELETE', 'DESCRIBE', 'OPTIONS' ):
+      return Response( 400, data={ 'message': 'Invalid Verb (HTTP Method)"{0}"'.format( request.verb ) } )
 
     try:
       ( path, model, action, id_list, multi ) = self.uri.split( request.uri )
@@ -1019,39 +1033,39 @@ class Server():
     if not isinstance( element, Element ):
       return Response( 500, 'confused, path ("{0}") yeilded non element "{1}"'.format( request.uri, element ) )
 
-    if request.method == 'OPTIONS':  # options never need auth, nor is the Cinp-Version header required, we can take care of it early
+    if request.verb == 'OPTIONS':  # options never need auth, nor is the Cinp-Version header required, we can take care of it early
       response = element.options()
       if self.cors_allow_list is not None:
         response.header_map[ 'Access-Control-Allow-Methods' ] = response.header_map[ 'Allow' ]
-        response.header_map[ 'Access-Control-Allow-Headers' ] = 'Accept, Cinp-Version, Auth-Id, Auth-Token, Filter, Content-Type, Count, Position, Multi-Object'
+        response.header_map[ 'Access-Control-Allow-Headers' ] = 'Accept, Cinp-Version, Auth-Id, Auth-Token, Filter, Content-Type, Count, Position, Multi-Object, Id-Only'
 
       return response
 
     if request.header_map.get( 'CINP-VERSION', None ) != __CINP_VERSION__:
       return Response( 400, data={ 'message': 'Invalid CInP Protocol Version' } )
 
-    if ( action is not None ) and ( request.method not in ( 'CALL', 'DESCRIBE' ) ):
-      raise InvalidRequest( 'Invalid method "{0}" for request with action'.format( request.method ) )
+    if ( action is not None ) and ( request.verb not in ( 'CALL', 'DESCRIBE' ) ):
+      raise InvalidRequest( 'Invalid verb "{0}" for request with action'.format( request.verb ) )
 
-    if request.method in ( 'CALL', ) and not isinstance( element, Action ):
-      raise InvalidRequest( 'Method "{0}" requires action'.format( request.method ) )
+    if request.verb in ( 'CALL', ) and not isinstance( element, Action ):
+      raise InvalidRequest( 'Verb "{0}" requires action'.format( request.verb ) )
 
-    if ( id_list is not None ) and ( request.method not in ( 'GET', 'UPDATE', 'DELETE', 'CALL' ) ):
-      raise InvalidRequest( 'Invalid method "{0}" for request with id'.format( request.method ) )
+    if ( id_list is not None ) and ( request.verb not in ( 'GET', 'UPDATE', 'DELETE', 'CALL' ) ):
+      raise InvalidRequest( 'Invalid Verb "{0}" for request with id'.format( request.verb ) )
 
-    if ( request.method in ( 'GET', 'UPDATE', 'DELETE' ) ) and ( id_list is None ):
-      raise InvalidRequest( 'Method "{0}" requires id'.format( request.method ) )
+    if ( request.verb in ( 'GET', 'UPDATE', 'DELETE' ) ) and ( id_list is None ):
+      raise InvalidRequest( 'Verb "{0}" requires id'.format( request.verb ) )
 
-    if ( request.data is not None ) and ( request.method not in ( 'LIST', 'UPDATE', 'CREATE', 'CALL' ) ):
-      raise InvalidRequest( 'Invalid method "{0}" for request with data'.format( request.method ) )
+    if ( request.data is not None ) and ( request.verb not in ( 'LIST', 'UPDATE', 'CREATE', 'CALL' ) ):
+      raise InvalidRequest( 'Invalid verb "{0}" for request with data'.format( request.verb ) )
 
-    if (request.method in ( 'UPDATE', 'CREATE' ) ) and ( request.data is None ):
-      raise InvalidRequest( 'Method "{0}" requires data'.format( request.method ) )
+    if ( request.verb in ( 'UPDATE', 'CREATE' ) ) and ( request.data is None ):
+      raise InvalidRequest( 'Verb "{0}" requires data'.format( request.verb ) )
 
-    if ( request.method in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE' ) ) and not isinstance( element, Model ):
-      raise InvalidRequest( 'Method "{0}" requires model'.format( request.method ) )
+    if ( request.verb in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE' ) ) and not isinstance( element, Model ):
+      raise InvalidRequest( 'Verb "{0}" requires model'.format( request.verb ) )
 
-    if ( isinstance( element, Model ) and ( request.method in element.not_allowed_method_list ) ) or ( isinstance( element, Action ) and ( request.method in element.parent.not_allowed_method_list ) ):
+    if ( isinstance( element, Model ) and ( request.verb in element.not_allowed_verb_list ) ) or ( isinstance( element, Action ) and ( request.verb in element.parent.not_allowed_verb_list ) ):
       raise NotAuthorized()
 
     multi = id_list is not None and len( id_list ) > 1
@@ -1073,10 +1087,10 @@ class Server():
       user = AnonymouseUser()
 
     if not user.isSuperuser:
-      if not element.checkAuth( user, request.method, id_list ):
+      if not element.checkAuth( user, request.verb, id_list ):
         raise NotAuthorized()
 
-    if request.method == 'DESCRIBE':
+    if request.verb == 'DESCRIBE':
       return element.describe()
 
     result = None
@@ -1088,10 +1102,10 @@ class Server():
       converter = element.parent.converter
 
     try:
-      if request.method == 'GET':
+      if request.verb == 'GET':
         result = element.get( converter, transaction, id_list, multi )
 
-      elif request.method == 'LIST':
+      elif request.verb == 'LIST':
         result = element.list( converter, transaction, request.data, request.header_map )
 
       # some CREATE thoughts
@@ -1099,16 +1113,16 @@ class Server():
       #    allow list of dicts to create more than one at a time
       #    if multi create, then mutli-object header options
       #    if multi create, return values like multi GET
-      elif request.method == 'CREATE':
-        result = element.create( converter, transaction, request.data )
+      elif request.verb == 'CREATE':
+          result = element.create( converter, transaction, request.data )
 
-      elif request.method == 'UPDATE':
+      elif request.verb == 'UPDATE':
         result = element.update( converter, transaction, id_list, request.data, multi )
 
-      if request.method == 'DELETE':
+      if request.verb == 'DELETE':
         result = element.delete( transaction, id_list )
 
-      elif request.method == 'CALL':
+      elif request.verb == 'CALL':
         result = element.call( converter, transaction, id_list, request.data, multi )
 
     except Exception as e:
@@ -1117,7 +1131,7 @@ class Server():
 
     if result is None:
       transaction.abort()
-      return Response( 500, 'Confused,  method "{0}"'.format( request.method ) )
+      return Response( 500, 'Confused, verb "{0}"'.format( request.verb ) )
 
     transaction.commit()
     return result
@@ -1142,13 +1156,13 @@ class Server():
 
 
 class Request():
-  def __init__( self, method, uri, header_map ):
+  def __init__( self, verb, uri, header_map ):
     super().__init__()
-    self.method = method
+    self.verb = verb
     self.uri = uri  # make sure the query string/fragment/etc has allreay been stripped by the Child Class
     self.header_map = {}
     for name in header_map:
-      if name in ( 'CINP-VERSION', 'AUTH-ID', 'AUTH-TOKEN', 'CONTENT-TYPE', 'FILTER', 'POSITION', 'COUNT', 'MULTI-OBJECT' ):
+      if name in ( 'CINP-VERSION', 'AUTH-ID', 'AUTH-TOKEN', 'CONTENT-TYPE', 'FILTER', 'POSITION', 'COUNT', 'MULTI-OBJECT', 'ID-ONLY' ):
         self.header_map[ name ] = header_map[ name ]
 
     self.data = None
