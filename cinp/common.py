@@ -77,6 +77,9 @@ class URI():
     if isinstance( uri_list, str ):
       uri_list = [ uri_list ]
 
+    if not isinstance( uri_list, list ):
+      raise ValueError( 'uri_list must be string or list of strings' )
+
     result = []
     for uri in uri_list:
       uri_match = self.uri_regex.match( uri )
