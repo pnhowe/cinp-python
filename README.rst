@@ -2,7 +2,20 @@ CInP Python Implementation
 ==========================
 
 
+Instalation
+-----------
 
+Can be installed via pip::
+
+  pip install cinp
+
+
+debian pacaging files are also included, to build the cinp package::
+
+  dpkg-buildpackage
+
+this should create a .deb file in the parent directory.
+  
 
 
 File Paramaters/Fields
