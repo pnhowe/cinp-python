@@ -73,6 +73,15 @@ def paramater_model_resolver( model_name ):
   return model
 
 
+def property_model_resolver( model_name ):
+  try:
+    model = __MODEL_REGISTRY__[ model_name ]
+  except KeyError:
+    raise ValueError( 'Unknown paramater model "{0}" make sure it is registered'.format( model_name ) )
+
+  return ( None, None, model )
+
+
 def paramater_type_to_kwargs( paramater_type ):
   result = {}
 
@@ -269,14 +278,35 @@ class DjangoCInP():
         field_list.append( Field( **kwargs ) )
 
       for item in property_list_:
-        kwargs = {
-                   'name': item,
-                   'doc': None,
-                   'required': False,
-                   'default': None,
-                   'mode': 'RO',
-                   'type': 'String'
-                 }
+        if isinstance( item, dict ):
+          kwargs = {
+                     'name': item.get( 'name' ),
+                     'doc': item.get( 'doc', None ),
+                     'required': False,
+                     'default': None,
+                     'mode': 'RO',
+                     'type': item.get( 'type', 'String' )
+                   }
+
+          paramater_model_name = item.get( 'model', None )
+          if paramater_model_name is not None:
+            try:
+              model = paramater_model_resolver( paramater_model_name )
+            except ValueError:  # model_resolver had issues, try late resolving
+              kwargs[ 'model' ] = paramater_model_name
+              kwargs[ 'model_resolve' ] = property_model_resolver   # yes we are sending different than we called
+            else:
+              kwargs[ 'model' ] = model
+
+        else:
+          kwargs = {
+                     'name': item,
+                     'doc': None,
+                     'required': False,
+                     'default': None,
+                     'mode': 'RO',
+                     'type': 'String'
+                   }
 
         field_list.append( Field( **kwargs ) )
 

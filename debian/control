@@ -2,13 +2,13 @@ Source: cinp
 Section: multiverse/python
 Priority: optional
 Maintainer: Peter Howe <pnhowe@gmail.com>
-Build-Depends: cdbs, debhelper (>= 7), python3 (>= 3.4), python3-dev (>=2.7), python3-setuptools (>=20.0), lsb-release
-XS-Python-Version: >= 2.6
+Build-Depends: cdbs, debhelper (>= 7), python3 (>= 3.4), python3-dev (>= 3.4), python3-setuptools (>= 20.0), lsb-release
 Standards-Version: 3.8.3
+XS-Python-Version: >= 3.4
 
 Package: python3-cinp
 Architecture: all
-Depends: python3 (>= 3.4), python3-simplejson, ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}
+Depends: python3 (>= 3.4), python3-simplejson, python3-dateutil, ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}
 Description: CInP Python Client and Server
   CInP Python Client and Server
 
