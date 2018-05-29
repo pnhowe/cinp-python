@@ -315,7 +315,7 @@ class Paramater():
       self.type = None
 
     else:
-      if type not in FIELD_TYPE_LIST:
+      if type not in FIELD_TYPE_LIST and type != '_USER_':
         raise ValueError( 'Unknown field type "{0}"'.format( type ) )
 
       if type == 'String':
@@ -423,7 +423,7 @@ class Element():
   def delete( self, transaction, id_list ):
     raise InvalidRequest( 'Not DELETE able' )
 
-  def call( self, converter, transaction, id_list, data, multi ):
+  def call( self, converter, transaction, id_list, data, user, multi ):
     raise InvalidRequest( 'Not CALL able' )
 
   def options( self ):
@@ -846,21 +846,25 @@ class Action( Element ):
     return_type = self.return_paramater.describe()
     del return_type[ 'name' ]
     data = { 'name': self.name, 'path': self.path, 'doc': self.doc, 'return-type': return_type, 'static': self.static }
-    data[ 'paramaters' ] = [ item.describe() for item in self.paramater_map.values() ]
+    data[ 'paramaters' ] = [ item.describe() for item in self.paramater_map.values() if item.type != '_USER_' ]
 
     return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Action', 'Cache-Control': 'max-age=0' } )
 
-  def call( self, converter, transaction, id_list, data, multi ):
+  def call( self, converter, transaction, id_list, data, user, multi ):
     error_map = {}
     value_map = {}
     for paramater_name in self.paramater_map:  # should we be ignorning data?
       paramater = self.paramater_map[ paramater_name ]
-      try:
-        value_map[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
-      except KeyError:
-        value_map[ paramater_name ] = paramater.default
-      except ValueError as e:
-        error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( str( e ) )
+      if paramater.type == '_USER_':
+        value_map[ paramater_name ] = user
+
+      else:
+        try:
+          value_map[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
+        except KeyError:
+          value_map[ paramater_name ] = paramater.default
+        except ValueError as e:
+          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( str( e ) )
 
     if error_map != {}:
       raise InvalidRequest( data=error_map )
@@ -1123,7 +1127,7 @@ class Server():
         result = element.delete( transaction, id_list )
 
       elif request.verb == 'CALL':
-        result = element.call( converter, transaction, id_list, request.data, multi )
+        result = element.call( converter, transaction, id_list, request.data, user, multi )
 
     except Exception as e:
       transaction.abort()

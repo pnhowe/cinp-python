@@ -289,21 +289,21 @@ def test_call():
   transaction = model.transaction_class()
 
   action1 = Action( name='act1', return_paramater=Paramater( type='String' ), func=lambda: 'hello' )
-  resp = action1.call( converter, transaction, None, {}, False )
+  resp = action1.call( converter, transaction, None, {}, None, False )
   assert resp.http_code == 200
   assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'CALL', 'Multi-Object': 'False' }
   assert resp.data == 'hello'
 
   action2 = Action( name='act2', return_paramater=Paramater( type='String' ), paramater_list=[ Paramater( name='p1', type='String', default='alice' ) ], func=lambda p1: 'hello "{0}"'.format( p1 ) )
   # with pytest.raises( InvalidRequest ):  # should we be ignorning data?
-  #  resp = action2.call( converter, transaction, None, { 'p1': 'bob', 'nope': 'sue' }, False )
+  #  resp = action2.call( converter, transaction, None, { 'p1': 'bob', 'nope': 'sue' }, None, False )
 
-  resp = action2.call( converter, transaction, None, {}, False )
+  resp = action2.call( converter, transaction, None, {}, None, False )
   assert resp.http_code == 200
   assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'CALL', 'Multi-Object': 'False' }
   assert resp.data == 'hello "alice"'
 
-  resp = action2.call( converter, transaction, None, { 'p1': 'bob' }, False )
+  resp = action2.call( converter, transaction, None, { 'p1': 'bob' }, None, False )
   assert resp.http_code == 200
   assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'CALL', 'Multi-Object': 'False' }
   assert resp.data == 'hello "bob"'
@@ -311,21 +311,27 @@ def test_call():
   action3 = Action( name='act3', return_paramater=Paramater( type='String' ), func=lambda a: 'hello "{0}"'.format( a ), static=False )
   model.addAction( action3 )
   with pytest.raises( InvalidRequest ):
-    action3.call( converter, transaction, None, { 'a': 'bob' }, False )
+    action3.call( converter, transaction, None, { 'a': 'bob' }, None, False )
 
-  resp = action3.call( converter, transaction, [ 'sue' ], {}, False )
+  resp = action3.call( converter, transaction, [ 'sue' ], {}, None, False )
   assert resp.http_code == 200
   assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'CALL', 'Multi-Object': 'False' }
   assert resp.data == 'hello "{\'_extra_\': \'get "sue"\'}"'
 
   with pytest.raises( ObjectNotFound ):
-    action3.call( converter, transaction, [ 'NOT FOUND' ], {}, False )
+    action3.call( converter, transaction, [ 'NOT FOUND' ], {}, None, False )
 
   action4 = Action( name='act4', func=lambda: 'hello' )
-  resp = action4.call( converter, transaction, [], {}, False )
+  resp = action4.call( converter, transaction, [], {}, None, False )
   assert resp.http_code == 200
   assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'CALL', 'Multi-Object': 'False' }
   assert resp.data is None
+
+  action9 = Action( name='act9', return_paramater=Paramater( type='String' ), paramater_list=[ Paramater( name='p1', type='String' ), Paramater( name='p2', type='_USER_' ) ], func=lambda p1, p2: '{0}: {1}'.format( p1, p2 ) )
+  resp = action9.call( converter, transaction, None, { 'p1': 'stuff' }, 'Me The User', False )
+  assert resp.http_code == 200
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'CALL', 'Multi-Object': 'False' }
+  assert resp.data == 'stuff: Me The User'
 
 
 def test_create():
@@ -378,12 +384,12 @@ def test_list():
 
   resp = model.list( converter, transaction, {}, {} )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'LIST', 'Position': '0', 'Count': '2', 'Total': '2' }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'LIST', 'Position': '0', 'Count': '2', 'Total': '2', 'Id-Only': 'False' }
   assert resp.data == [ 'None:a:', 'None:b:' ]
 
   resp = model.list( converter, transaction, { 'more': 'bob' }, { 'FILTER': 'lots', 'POSITION': '23', 'COUNT': '45' } )
   assert resp.http_code == 200
-  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'LIST', 'Position': '50', 'Count': '8', 'Total': '100' }
+  assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'LIST', 'Position': '50', 'Count': '8', 'Total': '100', 'Id-Only': 'False' }
   assert resp.data == [ 'None:a:', 'None:b:', 'None:c:', 'None:d:', 'None:bob:', 'None:at 23:', 'None:for 45:', 'None:combined 68:' ]
 
   with pytest.raises( InvalidRequest ):

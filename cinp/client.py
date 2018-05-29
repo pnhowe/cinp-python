@@ -8,7 +8,7 @@ from urllib import request
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '0.9.3'
+__CLIENT_VERSION__ = '0.9.8'
 __CINP_VERSION__ = '0.9'
 
 __all__ = [ 'Timeout', 'ResponseError', 'InvalidRequest', 'InvalidSession',
@@ -49,7 +49,7 @@ class HTTPErrorProcessorPassthrough( request.HTTPErrorProcessor ):
 
 
 class CInP():
-  def __init__( self, host, root_path, port, proxy=None ):
+  def __init__( self, host, root_path, proxy=None ):
     super().__init__()
 
     if not host.startswith( ( 'http:', 'https:' ) ):
@@ -60,8 +60,7 @@ class CInP():
 
     self.proxy = proxy
     self.host = host
-    self.port = port
-    logging.debug( 'cinp: new client host: "{0}:{1}", root_path: "{2}", via: "{3}"'.format( self.host, self.port, root_path, self.proxy ) )
+    logging.debug( 'cinp: new client host: "{0}", root_path: "{1}", via: "{2}"'.format( self.host, root_path, self.proxy ) )
 
     self.uri = URI( root_path )
 
@@ -134,7 +133,7 @@ class CInP():
       else:
         data = json.dumps( data, default=JSONDefault ).encode( 'utf-8' )
 
-    url = '{0}:{1}{2}'.format( self.host, self.port, uri )
+    url = '{0}{1}'.format( self.host, uri )
     req = request.Request( url, data=data, headers=header_map )
     req.get_method = lambda: verb
     try:
@@ -461,7 +460,7 @@ class CInP():
       raise InvalidRequest( str( e ) )
 
     # Due to the return value we have to do our own request, this is pretty much a stright GET
-    url = '{0}:{1}{2}'.format( self.host, self.port, uri )
+    url = '{0}{1}'.format( self.host, uri )
     req = request.Request( url )
     req.get_method = lambda: 'GET'
     try:
