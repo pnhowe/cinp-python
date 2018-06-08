@@ -65,6 +65,9 @@ def field_model_resolver( django_field ):
 
 
 def paramater_model_resolver( model_name ):
+  if not isinstance( model_name, str ):
+    model_name = '{0}.{1}'.format( model_name.__module__, model_name.__qualname__ )
+
   try:
     model = __MODEL_REGISTRY__[ model_name ]
   except KeyError:
@@ -192,7 +195,7 @@ class DjangoCInP():
     return namespace
 
   # decorators
-  def model( self, hide_field_list=None, property_list=None, constant_set_map=None, not_allowed_verb_list=None, read_only_list=None, cache_length=3600 ):
+  def model( self, hide_field_list=None, show_field_list=None, property_list=None, constant_set_map=None, not_allowed_verb_list=None, read_only_list=None, cache_length=3600 ):
     def decorator( cls ):
       global __MODEL_REGISTRY__
 
@@ -200,10 +203,20 @@ class DjangoCInP():
       meta = cls._meta
       field_list = []
       hide_field_list_ = hide_field_list or []
+      show_field_list_ = show_field_list or []
       property_list_ = property_list or []
       read_only_list_ = read_only_list or []
+      if hide_field_list_ and show_field_list_:
+        raise ValueError( 'hide_field_list and show_field_list are Mutually Exclusive' )
+
       for django_field in meta.fields + meta.many_to_many:
-        if django_field.auto_created or django_field.name in hide_field_list_:
+        if django_field.auto_created:
+          continue
+
+        if hide_field_list_ and django_field.name in hide_field_list_:
+          continue
+
+        if show_field_list_ and django_field.name not in show_field_list_:
           continue
 
         kwargs = {
@@ -285,7 +298,8 @@ class DjangoCInP():
                      'required': False,
                      'default': None,
                      'mode': 'RO',
-                     'type': item.get( 'type', 'String' )
+                     'type': item.get( 'type', 'String' ),
+                     'choice_list': item.get( 'choices', None )
                    }
 
           paramater_model_name = item.get( 'model', None )
@@ -364,7 +378,7 @@ class DjangoCInP():
       default_offset = len( paramater_name_list ) - len( default_list or [] )
 
       if len( paramater_name_list ) != len( paramater_type_list_ ):
-        raise ValueError( 'paramater_name_list({0}) is not the same length as paramater_type_list({1})'.format( len( paramater_name_list ), len( paramater_type_list_ ) ) )
+        raise ValueError( 'paramater_name_list({0}) is not the same length as paramater_type_list({1}) for "{2}" of "{3}"'.format( len( paramater_name_list ), len( paramater_type_list_ ), name, model_name ) )
 
       paramater_list = []
       for index in range( 0, len( paramater_type_list_ ) ):
@@ -413,7 +427,7 @@ class DjangoCInP():
       paramater_name_list = func.__func__.__code__.co_varnames[ 0:func.__func__.__code__.co_argcount ]
 
       if len( paramater_name_list ) != len( paramater_type_list_ ):
-        raise ValueError( 'paramater_name_list({0}) is not the same length as paramater_type_list({1})'.format( len( paramater_name_list ), len( paramater_type_list_ ) ) )
+        raise ValueError( 'paramater_name_list({0}) is not the same length as paramater_type_list({1}) for filter "{2}" of "{3}"'.format( len( paramater_name_list ), len( paramater_type_list_, name, model_name ) ) )
 
       paramater_map = {}
       for index in range( 0, len( paramater_type_list_ ) ):

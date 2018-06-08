@@ -8,7 +8,7 @@ XS-Python-Version: >= 3.4
 
 Package: python3-cinp
 Architecture: all
-Depends: python3 (>= 3.4), python3-simplejson, python3-dateutil, ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}
+Depends: python3 (>= 3.4), python3-dateutil, ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}
 Description: CInP Python Client and Server
   CInP Python Client and Server
 

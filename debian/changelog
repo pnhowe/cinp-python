@@ -1,3 +1,9 @@
+cinp (0.9.8-1) DIST; urgency=medium
+
+  * django model resolver fix
+
+ -- Peter <peter@xps13-01>  Fri, 08 Jun 2018 09:34:47 -0600
+
 cinp (0.9.7-1) DIST; urgency=medium
 
   * Initial release.
