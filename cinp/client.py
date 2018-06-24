@@ -151,6 +151,9 @@ class CInP():
     except socket.timeout:
       raise Timeout( 'Request Timeout after {0} seconds'.format( timeout ) )
 
+    except socket.error as e:
+      raise ResponseError( 'Socket Error "{0}"'.format( e ) )
+
     http_code = resp.code
     if http_code not in ( 200, 201, 202, 400, 401, 403, 404, 500 ):
       raise ResponseError( 'HTTP code "{0}" unhandled'.format( resp.code ) )
