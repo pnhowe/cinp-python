@@ -2,7 +2,8 @@ import re
 import random
 import django
 from django.db import DatabaseError, models
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.apps import apps
+from django.core.exceptions import ObjectDoesNotExist, ValidationError, AppRegistryNotReady
 from django.db.models import fields
 from django.core.files import File
 
@@ -33,7 +34,7 @@ def field_model_resolver( django_field ):
     try:
       auto_created = remote_field.through._meta.auto_created
     except AttributeError:
-      raise ValueError( 'Unknown target model "{0}" make sure it is registered'.format( remote_field.through ) )
+      raise ValueError( 'Unknown target model "{0}" make sure it is registered, field: "{1}" model: "{2}"'.format( remote_field.through, django_field.name, django_field.model.__qualname__ ) )
 
     if auto_created is False:
       mode = 'RO'
@@ -52,14 +53,26 @@ def field_model_resolver( django_field ):
   else:
     django_model = remote_field.model
 
+  if isinstance( django_model, str ):  # this catches the case where there is a circular app refrence, so django has yet to fully map one of the sides when this is run
+    try:
+      ( app_name, model_name ) = django_model.split( '.' )
+    except ValueError:
+      raise ValueError( 'Remote Field model name "{0}" in unexpected format, field: "{1}" model: "{2}"'.format( django_model, django_field.name, django_field.model.__qualname__ ) )
+
+    try:  # it is expected that this will throw an exception on the first try, but the late resolve should suceede
+      app_config = apps.get_app_config( app_name )
+      django_model = app_config.get_model( model_name )
+    except AppRegistryNotReady as e:
+      raise ValueError( 'App Registry Not Ready: "{0}", when resolving model name "{1}" in unexpected format, field: "{2}" model: "{3}"'.format( e, django_model, django_field.name, django_field.model.__qualname__ ) )
+
   if not isinstance( django_model, models.base.ModelBase ):
-    raise ValueError( 'Remote Field model is not a model type, got "{0}"({1})'.format( django_model, type( django_model ) ) )
+    raise ValueError( 'Remote Field model is not a model type, got "{0}"({1}), field: "{2}" model: "{3}"'.format( django_model, type( django_model ), django_field.name, django_field.model.__qualname__ ) )
 
   target_model_name = '{0}.{1}'.format( django_model.__module__, django_model.__qualname__ )
   try:
     model = __MODEL_REGISTRY__[ target_model_name ]
   except KeyError:
-    raise ValueError( 'Unknown field model "{0}" make sure it is registered'.format( target_model_name ) )
+    raise ValueError( 'Unknown field model "{0}" make sure it is registered, field: "{1}" model: "{2}"'.format( target_model_name, django_field.name, django_field.model.__qualname__ ) )
 
   return ( mode, is_array, model )
 

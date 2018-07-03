@@ -48,7 +48,8 @@ class WerkzeugServer( Server ):
         namespace = module
       else:
         module = import_module( '{0}.models'.format( module ) )
-        namespace = module.cinp.getNamespace( self.uri )
+        if hasattr( module, 'cinp' ):
+          namespace = module.cinp.getNamespace( self.uri )
 
     super().registerNamespace( path, namespace )
 
