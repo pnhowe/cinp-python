@@ -64,7 +64,7 @@ class CInP():
 
     self.uri = URI( root_path )
 
-    if self.proxy is not None:  # have a proxy option to take it from the envrionment vars
+    if self.proxy:  # not doing 'is not None', so empty strings don't try and proxy   # have a proxy option to take it from the envrionment vars
       self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( { 'http': self.proxy, 'https': self.proxy } ) )
     else:
       self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( {} ) )
