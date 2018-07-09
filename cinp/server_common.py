@@ -1012,6 +1012,10 @@ class Server():
         else:
           response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
 
+    else:
+      if not isinstance( response, Response ):
+        response = Response( 500, data={ 'message': 'Path Handler Return an Invalid Response: ({0})"{1}"'.format( type( response ).__name__, str( response ) ) } )
+
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
     if self.cors_allow_list is not None:
       response.header_map[ 'Access-Control-Allow-Origin' ] = ', '.join( self.cors_allow_list )

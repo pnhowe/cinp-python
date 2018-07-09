@@ -87,7 +87,7 @@ def upload_handler( request ):  # TODO: also support multi-part
   if content_disposition is not None:
     match = INLINE_CONTENT_DISPOSITION.match( content_disposition )
     if not match:
-      return InvalidRequest( message='Invalid Content-Disposition' )
+      return InvalidRequest( message='Invalid Content-Disposition' ).asResponse()
     filename = match.groups( 1 )[0]
   else:
     filename = None
