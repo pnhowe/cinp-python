@@ -2,7 +2,7 @@
 import os
 import sys
 
-sys.path.insert( 1,  '..')
+sys.path.insert( 1, '..')
 
 os.environ.setdefault( 'DJANGO_SETTINGS_MODULE', 'settings' )
 import django
@@ -17,6 +17,7 @@ from cinp.server_werkzeug import WerkzeugServer
 from User.models import getUser
 
 DEBUG = True
+
 
 class GunicornApp( BaseApplication ):
   def __init__( self, application, options=None ):

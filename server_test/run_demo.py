@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 import sys
 
-sys.path.insert( 1,  '..')
+sys.path.insert( 1, '..')
 
 import http.client as httplib
-from cinp.client import CInP, InvalidRequest, NotFound, NotAuthorized
+from cinp.client import CInP, NotFound, NotAuthorized
 
 
 client = CInP( host='http://127.0.0.1', root_path='/api/v1/', port=8888 )

@@ -21,26 +21,42 @@ class MockResponse():
 
 
 def test_constructor():
-  CInP( 'http://localhost', '/api/v1/', 8080, None )
+  CInP( 'http://localhost:8080', '/api/v1/', None )
+  CInP( 'http://localhost', '/api/v1/', None )
 
   with pytest.raises( ValueError ):
-    CInP( 'localhost', '/api/v1/', 8080, None )
+    CInP( 'localhost', '/api/v1/', None )
 
   with pytest.raises( ValueError ):
-    CInP( 'http://localhost', '/api/v1', 8080, None )
+    CInP( 'http://localhost', '/api/v1', None )
 
   with pytest.raises( ValueError ):
-    CInP( 'http://localhost', 'api/v1', 8080, None )
+    CInP( 'http://localhost', 'api/v1', None )
 
   with pytest.raises( ValueError ):
-    CInP( 'http://localhost', 'api/v1/', 8080, None )
+    CInP( 'http://localhost', 'api/v1/', None )
 
   with pytest.raises( ValueError ):
-    CInP( 'http://localhost/', '/api/v1/', 8080, None )
+    CInP( 'http://localhost/', '/api/v1/', None )
+
+  with pytest.raises( ValueError ):
+    CInP( 'localhost:8080', '/api/v1/', None )
+
+  with pytest.raises( ValueError ):
+    CInP( 'http://localhost:8080', '/api/v1', None )
+
+  with pytest.raises( ValueError ):
+    CInP( 'http://localhost:8080', 'api/v1', None )
+
+  with pytest.raises( ValueError ):
+    CInP( 'http://localhost:8080', 'api/v1/', None )
+
+  with pytest.raises( ValueError ):
+    CInP( 'http://localhost:8080/', '/api/v1/', None )
 
 
 def test_checkRequest():
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost', '/api/v1/', None )
 
   # describe
   with pytest.raises( InvalidRequest ):
@@ -301,7 +317,7 @@ def test_checkRequest():
 
 
 def test_request( mocker ):
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '' )
 
@@ -422,7 +438,7 @@ def test_request( mocker ):
   assert data is None
   assert header_map == {}
 
-  cinp = CInP( 'http://bob.com', '/theapi/', 70, 'http://proxy:3128/' )
+  cinp = CInP( 'http://bob.com:70', '/theapi/', 'http://proxy:3128/' )
   mocked_open.reset_mock()
   mocked_open.return_value = MockResponse( 200, {}, '' )
   ( code, data, header_map ) = cinp._request( 'GET', '/theapi/model:123:' )
@@ -435,9 +451,22 @@ def test_request( mocker ):
   assert data is None
   assert header_map == {}
 
+  cinp = CInP( 'http://asdf.com', '/theapi/', 'http://proxy:3128/' )
+  mocked_open.reset_mock()
+  mocked_open.return_value = MockResponse( 200, {}, '' )
+  ( code, data, header_map ) = cinp._request( 'GET', '/theapi/model:123:' )
+  req = mocked_open.call_args[0][0]
+  assert req.full_url == 'http://asdf.com/theapi/model:123:'
+  assert req.data == b''
+  assert req.headers == { 'Content-type': 'application/json;charset=utf-8' }
+  assert req.get_method() == 'GET'
+  assert code == 200
+  assert data is None
+  assert header_map == {}
+
 
 def test_get( mocker ):
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '{"key": "value", "thing": "stuff"}' )
 
@@ -483,7 +512,7 @@ def test_get( mocker ):
 
 
 def test_list( mocker ):
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, { 'Position': '0', 'Count': '2', 'Total': '20' }, '["/api/v1/model:123:","/api/v1/model:124:"]' )
 
@@ -577,7 +606,7 @@ def test_list( mocker ):
 
 
 def test_create( mocker ):
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 201, { 'Object-Id': 'test' }, '{"asdf": "erere"}' )
 
@@ -624,7 +653,7 @@ def test_create( mocker ):
 
 
 def test_update( mocker ):
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '{"hi": "there"}' )
 
@@ -677,7 +706,7 @@ def test_update( mocker ):
 
 
 def test_delete( mocker ):
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '{}' )
 
@@ -717,7 +746,7 @@ def test_delete( mocker ):
 
 
 def test_call( mocker ):
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '{}' )
 
@@ -801,7 +830,7 @@ def test_call( mocker ):
 
 
 def test_describe( mocker ):
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '' )
 
@@ -842,13 +871,13 @@ def test_describe( mocker ):
 
 
 def test_setauth():
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   cinp.setAuth( 'user', 'token' )
   cinp.setAuth()
 
 
 def test_get_multi( mocker ):
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, {}, '{"/api/v1/ns/model:asd:":{"key1":"value1"},"/api/v1/ns/model:efe:":{"key2":"value2"}}' )
 
@@ -903,7 +932,7 @@ def test_get_multi( mocker ):
 
 
 def test_get_filtered_objects( mocker ):
-  cinp = CInP( 'http://localhost', '/api/v1/', 8080, None )
+  cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
   mocked_open.return_value = MockResponse( 200, { 'Position': 0, 'Count': 2, 'Total': 2 }, '["/api/v1/ns/model:asd:","/api/v1/ns/model:efe:"]' )
 

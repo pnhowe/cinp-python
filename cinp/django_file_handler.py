@@ -68,7 +68,7 @@ def upload_view( django_request ):
 
 # for gnuicorn apps
 def upload_handler( request ):  # TODO: also support multi-part
-  if request.method == 'OPTIONS':
+  if request.verb == 'OPTIONS':
     header_map = {}
     header_map[ 'Allow' ] = 'OPTIONS, POST'
     header_map[ 'Cache-Control' ] = 'max-age=0'
@@ -77,8 +77,8 @@ def upload_handler( request ):  # TODO: also support multi-part
 
     return Response( 200, data=None, header_map=header_map )
 
-  if request.method != 'POST':
-    return Response( 400, data='Invalid Method', content_type='text' )
+  if request.verb != 'POST':
+    return Response( 400, data='Invalid Verb (HTTP Method)', content_type='text' )
 
   if request.header_map.get( 'CONTENT-TYPE', None ) != 'application/octet-stream':
     return Response( 400, data='Invalid Content-Type', content_type='text' )
@@ -87,7 +87,7 @@ def upload_handler( request ):  # TODO: also support multi-part
   if content_disposition is not None:
     match = INLINE_CONTENT_DISPOSITION.match( content_disposition )
     if not match:
-      return InvalidRequest( message='Invalid Content-Disposition' )
+      return InvalidRequest( message='Invalid Content-Disposition' ).asResponse()
     filename = match.groups( 1 )[0]
   else:
     filename = None

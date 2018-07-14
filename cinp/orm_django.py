@@ -2,7 +2,8 @@ import re
 import random
 import django
 from django.db import DatabaseError, models
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.apps import apps
+from django.core.exceptions import ObjectDoesNotExist, ValidationError, AppRegistryNotReady
 from django.db.models import fields
 from django.core.files import File
 
@@ -33,7 +34,7 @@ def field_model_resolver( django_field ):
     try:
       auto_created = remote_field.through._meta.auto_created
     except AttributeError:
-      raise ValueError( 'Unknown target model "{0}" make sure it is registered'.format( remote_field.through ) )
+      raise ValueError( 'Unknown target model "{0}" make sure it is registered, field: "{1}" model: "{2}"'.format( remote_field.through, django_field.name, django_field.model.__qualname__ ) )
 
     if auto_created is False:
       mode = 'RO'
@@ -52,25 +53,49 @@ def field_model_resolver( django_field ):
   else:
     django_model = remote_field.model
 
+  if isinstance( django_model, str ):  # this catches the case where there is a circular app refrence, so django has yet to fully map one of the sides when this is run
+    try:
+      ( app_name, model_name ) = django_model.split( '.' )
+    except ValueError:
+      raise ValueError( 'Remote Field model name "{0}" in unexpected format, field: "{1}" model: "{2}"'.format( django_model, django_field.name, django_field.model.__qualname__ ) )
+
+    try:  # it is expected that this will throw an exception on the first try, but the late resolve should suceede
+      app_config = apps.get_app_config( app_name )
+      django_model = app_config.get_model( model_name )
+    except AppRegistryNotReady as e:
+      raise ValueError( 'App Registry Not Ready: "{0}", when resolving model name "{1}" in unexpected format, field: "{2}" model: "{3}"'.format( e, django_model, django_field.name, django_field.model.__qualname__ ) )
+
   if not isinstance( django_model, models.base.ModelBase ):
-    raise ValueError( 'Remote Field model is not a model type, got "{0}"({1})'.format( django_model, type( django_model ) ) )
+    raise ValueError( 'Remote Field model is not a model type, got "{0}"({1}), field: "{2}" model: "{3}"'.format( django_model, type( django_model ), django_field.name, django_field.model.__qualname__ ) )
 
   target_model_name = '{0}.{1}'.format( django_model.__module__, django_model.__qualname__ )
   try:
     model = __MODEL_REGISTRY__[ target_model_name ]
   except KeyError:
-    raise ValueError( 'Unknown field model "{0}" make sure it is registered'.format( target_model_name ) )
+    raise ValueError( 'Unknown field model "{0}" make sure it is registered, field: "{1}" model: "{2}"'.format( target_model_name, django_field.name, django_field.model.__qualname__ ) )
 
   return ( mode, is_array, model )
 
 
 def paramater_model_resolver( model_name ):
+  if not isinstance( model_name, str ):
+    model_name = '{0}.{1}'.format( model_name.__module__, model_name.__qualname__ )
+
   try:
     model = __MODEL_REGISTRY__[ model_name ]
   except KeyError:
     raise ValueError( 'Unknown paramater model "{0}" make sure it is registered'.format( model_name ) )
 
   return model
+
+
+def property_model_resolver( model_name ):
+  try:
+    model = __MODEL_REGISTRY__[ model_name ]
+  except KeyError:
+    raise ValueError( 'Unknown paramater model "{0}" make sure it is registered'.format( model_name ) )
+
+  return ( None, None, model )
 
 
 def paramater_type_to_kwargs( paramater_type ):
@@ -168,22 +193,22 @@ class DjangoCInP():
   # this is called to get the namespace to attach to the server
   def getNamespace( self, uri ):
     namespace = Namespace( name=self.name, version=self.version, doc=self.doc, converter=DjangoConverter( uri ) )
-    namespace.checkAuth = lambda user, method, id_list: True
+    namespace.checkAuth = lambda user, verb, id_list: True
     for model in self.model_list:
       check_auth = self.check_auth_map.get( model.name, None )
       if check_auth is None:
-        check_auth = lambda user, method, id_list, action=None: False
+        check_auth = lambda user, verb, id_list, action=None: False
 
       namespace.addElement( model )
       model.checkAuth = check_auth
       for action in self.action_map.get( model.name, [] ):
-        action.checkAuth = lambda user, method, id_list: check_auth( user, method, id_list, action )
+        action.checkAuth = lambda user, verb, id_list: check_auth( user, verb, id_list, action )
         model.addAction( action )
 
     return namespace
 
   # decorators
-  def model( self, hide_field_list=None, property_list=None, constant_set_map=None, not_allowed_method_list=None, read_only_list=None, cache_length=3600 ):
+  def model( self, hide_field_list=None, show_field_list=None, property_list=None, constant_set_map=None, not_allowed_verb_list=None, read_only_list=None, cache_length=3600 ):
     def decorator( cls ):
       global __MODEL_REGISTRY__
 
@@ -191,10 +216,20 @@ class DjangoCInP():
       meta = cls._meta
       field_list = []
       hide_field_list_ = hide_field_list or []
+      show_field_list_ = show_field_list or []
       property_list_ = property_list or []
       read_only_list_ = read_only_list or []
+      if hide_field_list_ and show_field_list_:
+        raise ValueError( 'hide_field_list and show_field_list are Mutually Exclusive' )
+
       for django_field in meta.fields + meta.many_to_many:
-        if django_field.auto_created or django_field.name in hide_field_list_:
+        if django_field.auto_created:
+          continue
+
+        if hide_field_list_ and django_field.name in hide_field_list_:
+          continue
+
+        if show_field_list_ and django_field.name not in show_field_list_:
           continue
 
         kwargs = {
@@ -269,14 +304,36 @@ class DjangoCInP():
         field_list.append( Field( **kwargs ) )
 
       for item in property_list_:
-        kwargs = {
-                   'name': item,
-                   'doc': None,
-                   'required': False,
-                   'default': None,
-                   'mode': 'RO',
-                   'type': 'String'
-                 }
+        if isinstance( item, dict ):
+          kwargs = {
+                     'name': item.get( 'name' ),
+                     'doc': item.get( 'doc', None ),
+                     'required': False,
+                     'default': None,
+                     'mode': 'RO',
+                     'type': item.get( 'type', 'String' ),
+                     'choice_list': item.get( 'choices', None )
+                   }
+
+          paramater_model_name = item.get( 'model', None )
+          if paramater_model_name is not None:
+            try:
+              model = paramater_model_resolver( paramater_model_name )
+            except ValueError:  # model_resolver had issues, try late resolving
+              kwargs[ 'model' ] = paramater_model_name
+              kwargs[ 'model_resolve' ] = property_model_resolver   # yes we are sending different than we called
+            else:
+              kwargs[ 'model' ] = model
+
+        else:
+          kwargs = {
+                     'name': item,
+                     'doc': None,
+                     'required': False,
+                     'default': None,
+                     'mode': 'RO',
+                     'type': 'String'
+                   }
 
         field_list.append( Field( **kwargs ) )
 
@@ -291,7 +348,7 @@ class DjangoCInP():
       except AttributeError:
         doc = None
 
-      model = Model( name=name, doc=doc, transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_set_map=constant_set_map, not_allowed_method_list=not_allowed_method_list )
+      model = Model( name=name, doc=doc, transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_set_map=constant_set_map, not_allowed_verb_list=not_allowed_verb_list )
       model._django_model = cls
       model._django_filter_funcs_map = filter_funcs_map
       self.model_list.append( model )
@@ -300,13 +357,13 @@ class DjangoCInP():
 
     return decorator
 
-  def staticModel( self, not_allowed_method_list=None, cache_length=3600 ):
+  def staticModel( self, not_allowed_verb_list=None, cache_length=3600 ):
     def decorator( cls ):
 
       name = cls.__qualname__
-      not_allowed_method_list_ = list( set( [ 'LIST', 'GET', 'CREATE', 'UPDATE', 'DELETE' ] ).union( set( not_allowed_method_list or [] ) ) )
+      not_allowed_verb_list_ = list( set( [ 'LIST', 'GET', 'CREATE', 'UPDATE', 'DELETE' ] ).union( set( not_allowed_verb_list or [] ) ) )
 
-      model = Model( name=name, transaction_class=DjangoTransaction, field_list=[], list_filter_map={}, constant_set_map={}, not_allowed_method_list=not_allowed_method_list_ )
+      model = Model( name=name, transaction_class=DjangoTransaction, field_list=[], list_filter_map={}, constant_set_map={}, not_allowed_verb_list=not_allowed_verb_list_ )
       self.model_list.append( model )
       return cls
 
@@ -334,7 +391,7 @@ class DjangoCInP():
       default_offset = len( paramater_name_list ) - len( default_list or [] )
 
       if len( paramater_name_list ) != len( paramater_type_list_ ):
-        raise ValueError( 'paramater_name_list({0}) is not the same length as paramater_type_list({1})'.format( len( paramater_name_list ), len( paramater_type_list_ ) ) )
+        raise ValueError( 'paramater_name_list({0}) is not the same length as paramater_type_list({1}) for "{2}" of "{3}"'.format( len( paramater_name_list ), len( paramater_type_list_ ), name, model_name ) )
 
       paramater_list = []
       for index in range( 0, len( paramater_type_list_ ) ):
@@ -383,7 +440,7 @@ class DjangoCInP():
       paramater_name_list = func.__func__.__code__.co_varnames[ 0:func.__func__.__code__.co_argcount ]
 
       if len( paramater_name_list ) != len( paramater_type_list_ ):
-        raise ValueError( 'paramater_name_list({0}) is not the same length as paramater_type_list({1})'.format( len( paramater_name_list ), len( paramater_type_list_ ) ) )
+        raise ValueError( 'paramater_name_list({0}) is not the same length as paramater_type_list({1}) for filter "{2}" of "{3}"'.format( len( paramater_name_list ), len( paramater_type_list_, name, model_name ) ) )
 
       paramater_map = {}
       for index in range( 0, len( paramater_type_list_ ) ):

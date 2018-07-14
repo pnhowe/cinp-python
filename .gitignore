@@ -4,19 +4,15 @@ __pycache__
 # setup.py temp stuff
 /build
 /dist
+/debian
+/rpmbuild
 /cinp.egg-info
 MANIFEST
+dpkg
+rpm
 
 # test/lint output/temp stuff
 htmlcov
 .coverage
 .coveragerc
 .cache
-
-
-debian/files
-debian/python-module-stampdir/
-debian/python3-cinp.debhelper.log
-debian/python3-cinp.substvars
-debian/python3-cinp/
-
