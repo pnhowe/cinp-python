@@ -546,7 +546,8 @@ class CInP():
       file_reader = _readerWrapper( filepath, cb )
 
     header_map = {
-                   'Content-Disposition': 'inline: filename="{0}"'.format( filename )
+                   'Content-Disposition': 'inline: filename="{0}"'.format( filename ),
+                   'Content-Length': len( file_reader )
                  }
 
     ( http_code, data, _ ) = self._request( 'UPLOAD', uri_parser.build( namespace, model ), data=file_reader, header_map=header_map, timeout=timeout )

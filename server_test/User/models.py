@@ -7,6 +7,7 @@ from django.db import models
 
 from cinp.orm_django import DjangoCInP as CInP
 
+
 class SystemAccount():
   @property
   def isSuperuser( self ):
@@ -15,6 +16,7 @@ class SystemAccount():
   @property
   def isAnonymouse( self ):
     return False
+
 
 def getUser( auth_id, auth_token ):
   if auth_id is None or auth_token is None:
@@ -93,7 +95,7 @@ class Session( models.Model ):
   @staticmethod
   def login( username, password ):
     try:
-      user =  User.objects.get( username=username )
+      user = User.objects.get( username=username )
     except User.DoesNotExist:
       raise ValueError( 'User Does Not Exist' )
 
@@ -101,7 +103,7 @@ class Session( models.Model ):
     if password != user.password:
       raise ValueError( 'Invalid Password' )
 
-    token = ''.join( random.choice( string.ascii_letters ) for _  in range( 30 ) )
+    token = ''.join( random.choice( string.ascii_letters ) for _ in range( 30 ) )
     session = Session( session_id=token, user=user )
     session.last_checkin = datetime.now( timezone.utc )
     session.save()
