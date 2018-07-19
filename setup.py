@@ -3,7 +3,6 @@
 import os
 from distutils.core import setup
 from distutils.command.build_py import build_py
-#  import setuptools  # so we have develop mode
 
 
 class build( build_py ):
@@ -21,7 +20,7 @@ class build( build_py ):
 
 
 setup( name='cinp',
-       version='0.9.9',
+       version='0.9.10',
        description='CInP, Concise Interaction Protocol',
        long_description="""A HTTP/JSON Protocol that brings some of the
 flexability of REST, but extends beyond CRUD to support Metod Calling and
