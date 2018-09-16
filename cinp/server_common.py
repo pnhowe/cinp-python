@@ -67,9 +67,9 @@ def _dictConverter( value ):
 
 MAP_TYPE_CONVERTER = {
                        'NoneType': lambda a: None,
-                       'str': str,
-                       'int': str,
-                       'float': str,
+                       'str': lambda a: a,
+                       'int': lambda a: a,
+                       'float': lambda a: a,
                        'bool': lambda a: True if a else False,
                        'datetime': lambda a: a.isoformat(),
                        'timedelta': lambda a: a.total_seconds(),
