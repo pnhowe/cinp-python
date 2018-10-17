@@ -1,15 +1,25 @@
+DISTRO := $(shell lsb_release -si | tr A-Z a-z)
+DISTRO_MAJOR_VERSION := $(shell lsb_release -sr | cut -d. -f1)
+DISTRO_NAME := $(shell lsb_release -sc | tr A-Z a-z)
+
 all:
 	./setup.py build
 
 install:
+ifeq (ubuntu, $(DISTRO))
 	./setup.py install --root $(DESTDIR) --install-purelib=/usr/lib/python3/dist-packages/ --prefix=/usr --no-compile -O0
+else
+	./setup.py install --root $(DESTDIR) --prefix=/usr --no-compile -O0
+endif
 
 clean:
 	./setup.py clean
 	$(RM) -fr build
 	$(RM) -f dpkg
 	$(RM) -f rpm
+ifeq (ubuntu, $(DISTRO))
 	dh_clean || true
+endif
 
 dist-clean: clean
 	$(RM) -fr debian
@@ -59,7 +69,7 @@ rpm-distros:
 	echo centos-6
 
 rpm-requires:
-	echo rpm-build
+	echo python34 rpm-build
 
 rpm-setup:
 	./rpmbuild-setup

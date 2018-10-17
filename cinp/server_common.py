@@ -1,6 +1,7 @@
-from dateutil import parser as datetimeparser
 import traceback
 import json
+import copy
+from dateutil import parser as datetimeparser
 from urllib import parse
 
 from cinp.common import URI
@@ -66,9 +67,9 @@ def _dictConverter( value ):
 
 MAP_TYPE_CONVERTER = {
                        'NoneType': lambda a: None,
-                       'str': str,
-                       'int': str,
-                       'float': str,
+                       'str': lambda a: a,
+                       'int': lambda a: a,
+                       'float': lambda a: a,
                        'bool': lambda a: True if a else False,
                        'datetime': lambda a: a.isoformat(),
                        'timedelta': lambda a: a.total_seconds(),
@@ -249,7 +250,7 @@ class Converter():
       if not isinstance( python_value, dict ):
         raise ValueError( 'Map must be dict' )
 
-      result = python_value.copy()
+      result = copy.deepcopy( python_value )
       _fromPythonMap( result )
 
       return result
@@ -595,11 +596,11 @@ class Model( Element ):
     result = {}
     for field_name in self.field_map:
       try:
-        result[ field_name ] = converter.fromPython( self.field_map[ field_name ], getattr( target_object, field_name ) )  # TODO: disguinsh between the AttributeError oflooking up the field, and any errors pulling the field value might cause
+        result[ field_name ] = converter.fromPython( self.field_map[ field_name ], getattr( target_object, field_name ) )  # TODO: disguinsh between the AttributeError of looking up the field, and any errors pulling the field value might cause
       except ValueError as e:
         raise ValueError( 'Error with "{0}": "{1}"'.format( field_name, str( e ) ) )
       except AttributeError:
-        raise ServerError( 'target_object missing field "{0}"'.format( field_name ) )  # yes, internal server error, target_object comes from inside the house
+        raise ServerError( 'target_object("{0}") missing field "{1}"'.format( target_object.__class__.__name__, field_name ) )  # yes, internal server error, target_object comes from inside the house
 
     return result
 
@@ -712,10 +713,10 @@ class Model( Element ):
         error_map[ field_name ] = 'Invalid Value "{0}"'.format( str( e ) )
 
       except KeyError:
-        if field.required:
-          error_map[ field_name ] = 'Required Field'
-        else:
+        if field.default is not None:
           value_map[ field_name ] = field.default
+        elif field.required:
+          error_map[ field_name ] = 'Required Field'
 
     if error_map != {}:
       raise InvalidRequest( data=error_map )

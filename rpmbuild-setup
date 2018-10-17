@@ -28,7 +28,7 @@ Version:        $VERSION
 Release:        $RELEASE.$DISTRO_RELEASE
 License:        Apache2
 Group:          multiverse/python
-Requires:       python3
+Requires:       python34
 BuildArch:      noarch
 
 %description
