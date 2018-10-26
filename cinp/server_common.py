@@ -14,8 +14,11 @@ FIELD_TYPE_LIST = ( 'String', 'Integer', 'Float', 'Boolean', 'DateTime', 'Map', 
 
 
 class InvalidRequest( Exception ):
-  def __init__( self, message=None, data=None):
-    self.data = data or { 'message': message } or 'Unknown'
+  def __init__( self, message=None, data=None ):
+    try:
+      self.data = message.response_data
+    except AttributeError:
+      self.data = data or { 'message': str( message ) }
 
   def asResponse( self ):
     return Response( 400, data=self.data )
@@ -598,7 +601,7 @@ class Model( Element ):
       try:
         result[ field_name ] = converter.fromPython( self.field_map[ field_name ], getattr( target_object, field_name ) )  # TODO: disguinsh between the AttributeError of looking up the field, and any errors pulling the field value might cause
       except ValueError as e:
-        raise ValueError( 'Error with "{0}": "{1}"'.format( field_name, str( e ) ) )
+        raise ValueError( 'Error with "{0}": "{1}"'.format( field_name, e ) )
       except AttributeError:
         raise ServerError( 'target_object("{0}") missing field "{1}"'.format( target_object.__class__.__name__, field_name ) )  # yes, internal server error, target_object comes from inside the house
 
@@ -638,6 +641,7 @@ class Model( Element ):
       position = int( header_map.get( 'POSITION', 0 ) )
     except ValueError:
       raise InvalidRequest( 'Count and Position must be integers if specified' )
+
     filter_values = {}
 
     if filter_name is not None:
@@ -655,7 +659,7 @@ class Model( Element ):
         try:
           filter_values[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
         except ValueError as e:
-          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( str( e ) )
+          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( e )
         except KeyError:
           error_map[ paramater_name ] = 'Required Paramater'
 
@@ -668,7 +672,7 @@ class Model( Element ):
       if isinstance( e.args[0], dict ):
         raise InvalidRequest( data=e.args[0] )
       else:
-        raise InvalidRequest( str( e ) )
+        raise InvalidRequest( e )
 
     if not isinstance( result, tuple ) and len( result ) != 3:
       raise ServerError( 'List result is not a valid tuple' )
@@ -710,7 +714,7 @@ class Model( Element ):
           value_map[ field_name ] = converter.toPython( field, data[ field_name ], transaction )
 
       except ValueError as e:
-        error_map[ field_name ] = 'Invalid Value "{0}"'.format( str( e ) )
+        error_map[ field_name ] = 'Invalid Value "{0}"'.format( e )
 
       except KeyError:
         if field.default is not None:
@@ -727,7 +731,7 @@ class Model( Element ):
       if isinstance( e.args[0], dict ):
         raise InvalidRequest( data=e.args[0] )
       else:
-        raise InvalidRequest( str( e ) )
+        raise InvalidRequest( e )
 
     if not isinstance( result, tuple ) and len( result ) != 2:
       raise ServerError( 'Create result is not a valid tuple' )
@@ -741,7 +745,7 @@ class Model( Element ):
         if isinstance( e.args[0], dict ):
           raise InvalidRequest( data=e.args[0] )
         else:
-          raise InvalidRequest( str( e ) )
+          raise InvalidRequest( e )
 
       if result is None:
         raise ServerError( 'Newly created object disapeared' )
@@ -758,7 +762,7 @@ class Model( Element ):
       if isinstance( e.args[0], dict ):
         raise InvalidRequest( data=e.args[0] )
       else:
-        raise InvalidRequest( str( e ) )
+        raise InvalidRequest( e )
 
     if result is None:
       raise ObjectNotFound( self.path, object_id )
@@ -789,7 +793,7 @@ class Model( Element ):
       try:
         value_map[ field_name ] = converter.toPython( field, data[ field_name ], transaction )
       except ValueError as e:
-        error_map[ field_name ] = 'Invalid Value "{0}"'.format( str( e ) )
+        error_map[ field_name ] = 'Invalid Value "{0}"'.format( e )
       except KeyError:
         pass
 
@@ -865,7 +869,7 @@ class Action( Element ):
         except KeyError:
           value_map[ paramater_name ] = paramater.default
         except ValueError as e:
-          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( str( e ) )
+          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( e )
 
     if error_map != {}:
       raise InvalidRequest( data=error_map )
@@ -882,7 +886,7 @@ class Action( Element ):
         else:
           result = converter.fromPython( self.return_paramater, self.func( self.parent._get( transaction, id_list[0] ), **value_map ) )
       except ValueError as e:
-        raise InvalidRequest( str( e ) )
+        raise InvalidRequest( e )
 
     else:
       if not self.static:
@@ -891,7 +895,7 @@ class Action( Element ):
       try:
         result = converter.fromPython( self.return_paramater, self.func( **value_map ) )
       except ValueError as e:
-        raise InvalidRequest( 'Invalid Result Value: "{0}"'.format( str( e ) ) )
+        raise InvalidRequest( 'Invalid Result Value: "{0}"'.format( e ) )
 
     return Response( 200, data=result, header_map={ 'Verb': 'CALL', 'Cache-Control': 'no-cache', 'Multi-Object': str( multi ) } )
 
@@ -987,9 +991,9 @@ class Server():
 
     except Exception as e:
       if self.debug:
-        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ), 'trace': traceback.format_exc() } )
+        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, e ), 'trace': traceback.format_exc() } )
       else:
-        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
+        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, e ) } )
 
     if response is None:
       try:
@@ -1009,13 +1013,13 @@ class Server():
 
       except Exception as e:
         if self.debug:
-          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ), 'trace': traceback.format_exc() } )
+          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, e ), 'trace': traceback.format_exc() } )
         else:
-          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
+          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, e ) } )
 
     else:
       if not isinstance( response, Response ):
-        response = Response( 500, data={ 'message': 'Path Handler Return an Invalid Response: ({0})"{1}"'.format( type( response ).__name__, str( response ) ) } )
+        response = Response( 500, data={ 'message': 'Path Handler Return an Invalid Response: ({0})"{1}"'.format( type( response ).__name__, response ) } )
 
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
     if self.cors_allow_list is not None:

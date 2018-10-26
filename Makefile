@@ -17,6 +17,7 @@ clean:
 	$(RM) -fr build
 	$(RM) -f dpkg
 	$(RM) -f rpm
+	$(RM) -fr htmlcov
 ifeq (ubuntu, $(DISTRO))
 	dh_clean || true
 endif
