@@ -64,6 +64,23 @@ class AnonymouseUser():
     return True
 
 
+def _debugDump( location, request, exception ):
+  import os
+  from datetime import datetime
+
+  try:
+    fp = open( os.path.join( location, datetime.utcnow().isoformat() ), 'w' )
+    fp.write( '** Request **\n\n' )
+    fp.write( str( request ) )
+    fp.write( '\n\n** Stack **\n\n' )
+    traceback.print_exception( None, exception, exception.__traceback__, file=fp )
+    fp.close()
+
+  except Exception as e:
+    import sys
+    sys.stderr.write( 'Error "{0}" when writing the debug dump'.format( e ) )
+
+
 def _dictConverter( value ):
   _fromPythonMap( value )
   return value
@@ -907,10 +924,11 @@ class Action( Element ):
 
 
 class Server():
-  def __init__( self, root_path, root_version, debug=False, cors_allow_list=None ):
+  def __init__( self, root_path, root_version, debug=False, cors_allow_list=None, debug_dump_location=None ):
     super().__init__()
     self.uri = URI( root_path )
     self.debug = debug
+    self.debug_dump_location = debug_dump_location
     self.root_namespace = Namespace( name=None, version=root_version, root_path=root_path, converter=Converter( self.uri ) )
     self.root_namespace.checkAuth = lambda user, verb, id_list: True
     self.cors_allow_list = cors_allow_list
@@ -990,6 +1008,9 @@ class Server():
           break
 
     except Exception as e:
+      if self.debug_dump_location is not None:
+        _debugDump( self.debug_dump_location, request, e )
+
       if self.debug:
         response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, e ), 'trace': traceback.format_exc() } )
       else:
@@ -1012,6 +1033,9 @@ class Server():
         response = Response( 403, data={ 'message': 'Not Authorized' } )
 
       except Exception as e:
+        if self.debug_dump_location is not None:
+          _debugDump( self.debug_dump_location, request, e )
+
         if self.debug:
           response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, e ), 'trace': traceback.format_exc() } )
         else:
@@ -1194,8 +1218,14 @@ class Request():
         self.data = None
         raise InvalidRequest( 'Error Parsing JSON Request data: "{0}"'.format( e ) )
 
-    def fromXML( self, buff ):
-      pass
+  def fromXML( self, buff ):
+    pass
+
+  def fromBytes( self, buff ):
+    pass
+
+  def __str__( self ):
+    return 'Request: Verb "{0}", URI "{1}", Header Map "{2}", Data "{3}"'.format( self.verb, self.uri, self.header_map, self.data )
 
 
 class Response():
@@ -1227,3 +1257,6 @@ class Response():
 
   def asBytes( self ):
     return None
+
+  def __str__( self ):
+    return 'Response: Content Type "{0}", HTTP Code "{1}", Header Map "{2}", Data "{3}"'.format( self.content_type, self.http_code, self.header_map, self.data )
