@@ -70,9 +70,9 @@ def _debugDump( location, request, exception ):
 
   try:
     fp = open( os.path.join( location, datetime.utcnow().isoformat() ), 'w' )
-    fp.write( '** Request **\n\n' )
+    fp.write( '** Request **\n' )
     fp.write( str( request ) )
-    fp.write( '\n\n** Stack **\n\n' )
+    fp.write( '\n\n** Stack **\n' )
     traceback.print_exception( None, exception, exception.__traceback__, file=fp )
     fp.close()
 
@@ -1225,7 +1225,7 @@ class Request():
     pass
 
   def __str__( self ):
-    return 'Request: Verb "{0}", URI "{1}", Header Map "{2}", Data "{3}"'.format( self.verb, self.uri, self.header_map, self.data )
+    return 'Request:\n  Verb: "{0}"\n  URI: "{1}"\n  Header Map: "{2}"\n  Data: "{3}"'.format( self.verb, self.uri, self.header_map, self.data )
 
 
 class Response():
@@ -1259,4 +1259,4 @@ class Response():
     return None
 
   def __str__( self ):
-    return 'Response: Content Type "{0}", HTTP Code "{1}", Header Map "{2}", Data "{3}"'.format( self.content_type, self.http_code, self.header_map, self.data )
+    return 'Response:\n  Content Type: "{0}"\n  HTTP Code: "{1}"\n  Header Map: "{2}"\n  Data: "{3}"'.format( self.content_type, self.http_code, self.header_map, self.data )
