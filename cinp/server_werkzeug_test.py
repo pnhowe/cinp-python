@@ -3,8 +3,12 @@ import json
 
 from werkzeug.datastructures import Headers
 
-from cinp.server_common import Response, Namespace, Model
+from cinp.server_common import Response, Namespace, Model, AnonymousUser
 from cinp.server_werkzeug import WerkzeugServer, WerkzeugRequest, WerkzeugResponse
+
+
+def getUser( auth_id, auth_token ):
+  return AnonymousUser()
 
 
 class FakeBody():  # set wsgi.input to  and instance of FakeBody, and set wsgi.input_terminated to true to make it work
@@ -99,7 +103,7 @@ def test_werkzeug_response():
 
 
 def test_werkzeug_server():
-  server = WerkzeugServer( root_path='/api/', root_version='0.0', debug=True, get_user=lambda id, token: 'Bob' )
+  server = WerkzeugServer( root_path='/api/', root_version='0.0', debug=True, get_user=getUser )
   ns = Namespace( name='ns1', version='0.1', converter=None )
   ns.addElement( Model( name='model1', field_list=[], transaction_class=None ) )
   server.registerNamespace( '/', ns )

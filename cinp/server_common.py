@@ -54,14 +54,22 @@ class NotAuthorized( Exception ):
   pass
 
 
-class AnonymouseUser():
+class AnonymousUser():
   @property
-  def isSuperuser( self ):
+  def is_superuser( self ):
     return False
 
   @property
-  def isAnonymouse( self ):
+  def is_anonymous( self ):
     return True
+
+
+def checkAuth_false( * args ):
+  return False
+
+
+def checkAuth_true( * args ):
+  return True
 
 
 def _debugDump( location, request, exception ):
@@ -930,12 +938,16 @@ class Server():
     self.debug = debug
     self.debug_dump_location = debug_dump_location
     self.root_namespace = Namespace( name=None, version=root_version, root_path=root_path, converter=Converter( self.uri ) )
-    self.root_namespace.checkAuth = lambda user, verb, id_list: True
+    self.root_namespace.checkAuth = checkAuth_true
     self.cors_allow_list = cors_allow_list
     self.path_handlers = {}
 
   def getUser( self, auth_id, auth_token ):
-    raise ValueError( 'getUser not implemented' )
+    if auth_id is not None and auth_token is not None:
+      raise ValueError( 'getUser not implemented' )
+
+    else:
+      return AnonymousUser()
 
   def _validateModel( self, model ):
     for field_name in model.field_map:
@@ -1115,15 +1127,12 @@ class Server():
 
     auth_id = request.header_map.get( 'AUTH-ID', None )
     auth_token = request.header_map.get( 'AUTH-TOKEN', None )
-    if auth_id is not None and auth_token is not None:
-      user = self.getUser( auth_id, auth_token )
-      if user is None:
-        return Response( 401, data={ 'message': 'Invalid Session' } )
 
-    else:
-      user = AnonymouseUser()
+    user = self.getUser( auth_id, auth_token )
+    if user is None:
+      return Response( 401, data={ 'message': 'Invalid Session' } )
 
-    if not user.isSuperuser:
+    if not user.is_superuser:
       if not element.checkAuth( user, request.verb, id_list ):
         raise NotAuthorized()
 

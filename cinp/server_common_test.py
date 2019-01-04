@@ -1,7 +1,7 @@
 import pytest
 
 from cinp.common import URI
-from cinp.server_common import __CINP_VERSION__, Converter, Paramater, Field, Namespace, Model, Action, Request, Response, Server, InvalidRequest, ServerError, ObjectNotFound
+from cinp.server_common import __CINP_VERSION__, Converter, Paramater, Field, Namespace, Model, Action, Request, Response, Server, InvalidRequest, ServerError, ObjectNotFound, AnonymousUser
 
 # TODO: test CORS header stuff
 
@@ -86,15 +86,18 @@ class testUser():
     self.mode = mode
 
   @property
-  def isSuperuser( self ):
+  def is_superuser( self ):
     return self.mode == 'super'
 
   @property
-  def isAnonymouse( self ):
-    return self.mode == 'anonymouse'
+  def is_anonymous( self ):
+    return self.mode == 'anonymous'
 
 
 def getUser( auth_id, auth_token ):
+  if auth_id is None or auth_token is None:
+    return AnonymousUser()
+
   if auth_id == 'super' and auth_token == 'super':
     return testUser( 'super' )
 
@@ -111,7 +114,7 @@ def getUser( auth_id, auth_token ):
 
 
 def checkAuth( user, verb, id_list ):
-  if user.isAnonymouse:
+  if user.is_anonymous:
     return False
 
   if user.mode == 'good':
