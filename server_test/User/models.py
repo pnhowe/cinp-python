@@ -10,11 +10,11 @@ from cinp.orm_django import DjangoCInP as CInP
 
 class SystemAccount():
   @property
-  def isSuperuser( self ):
+  def is_superuser( self ):
     return False
 
   @property
-  def isAnonymouse( self ):
+  def is_anonymous( self ):
     return False
 
 
@@ -30,10 +30,10 @@ def getUser( auth_id, auth_token ):
   except ( Session.DoesNotExist, User.DoesNotExist ):
     return None
 
-  if not session.user.isActive:
+  if not session.user.is_active:
     return None
 
-  if not session.isActive:
+  if not session.is_active:
     return None
 
   return session.user
@@ -42,7 +42,7 @@ def getUser( auth_id, auth_token ):
 cinp = CInP( 'User', '0.1' )
 
 
-@cinp.model( property_list=[ 'isActive' ], not_allowed_method_list=[ 'LIST', 'DELETE', 'CREATE', 'CALL' ], hide_field_list=[ 'password' ] )
+@cinp.model( property_list=[ 'is_active' ], not_allowed_method_list=[ 'LIST', 'DELETE', 'CREATE', 'CALL' ], hide_field_list=[ 'password' ] )
 class User( models.Model ):
   username = models.CharField( max_length=40, primary_key=True )
   password = models.CharField( editable=False, max_length=64 )
@@ -52,15 +52,15 @@ class User( models.Model ):
   created = models.DateTimeField( editable=False, auto_now_add=True )
 
   @property
-  def isActive( self ):
+  def is_active( self ):
     return True
 
   @property
-  def isSuperuser( self ):
+  def is_superuser( self ):
     return self.superuser
 
   @property
-  def isAnonymouse( self ):
+  def is_anonymous( self ):
     return False
 
   @cinp.action( paramater_type_list=[ 'String' ] )
@@ -80,7 +80,7 @@ class User( models.Model ):
     return 'User "{0}"'.format( self.username )
 
 
-@cinp.model( property_list=[ 'isActive' ], not_allowed_method_list=[ 'GET', 'LIST', 'DELETE', 'CREATE', 'UPDATE' ] )
+@cinp.model( property_list=[ 'is_active' ], not_allowed_method_list=[ 'GET', 'LIST', 'DELETE', 'CREATE', 'UPDATE' ] )
 class Session( models.Model ):
   session_id = models.CharField( max_length=64, primary_key=True )
   user = models.ForeignKey( User )
@@ -88,7 +88,7 @@ class Session( models.Model ):
   created = models.DateTimeField( editable=False, auto_now_add=True )
 
   @property
-  def isActive( self ):
+  def is_active( self ):
     return self.last_checkin < ( datetime.now( timezone.utc ) + timedelta( seconds=30 ) )
 
   @cinp.action( return_type='String', paramater_type_list=[ 'String', 'String' ] )

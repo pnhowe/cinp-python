@@ -6,6 +6,10 @@ from importlib import import_module
 from cinp.server_common import Server, Request, Response, Namespace, Converter, InvalidRequest
 
 
+class NoCINP( Exception ):
+  pass
+
+
 class WerkzeugServer( Server ):
   def __init__( self, get_user, *args, **kwargs ):
     super().__init__( *args, **kwargs )
@@ -26,8 +30,8 @@ class WerkzeugServer( Server ):
       return WerkzeugResponse( response ).buildNativeResponse()
 
     except Exception as e:
-      logging.exception( 'Top level Exception, "{0}"({1})'.format( str( e ), type( e ).__name__ ) )
-      return werkzeug.wrappers.BaseResponse( response='Error getting WerkzeugResponse, "{0}"({1})'.format( str( e ), type( e ).__name__ ), status=500, content_type='text/plain' )
+      logging.exception( 'Top level Exception, "{0}"({1})'.format( e, type( e ).__name__ ) )
+      return werkzeug.wrappers.BaseResponse( response='Error getting WerkzeugResponse, "{0}"({1})'.format( e, type( e ).__name__ ), status=500, content_type='text/plain' )
 
   def __call__( self, envrionment, start_response ):
     """
@@ -46,10 +50,13 @@ class WerkzeugServer( Server ):
     else:
       if isinstance( module, Namespace ):
         namespace = module
+
       else:
         module = import_module( '{0}.models'.format( module ) )
-        if hasattr( module, 'cinp' ):
-          namespace = module.cinp.getNamespace( self.uri )
+        if not hasattr( module, 'cinp' ):
+          raise NoCINP( 'module "{0}" missing cinp'.format( module ) )
+
+        namespace = module.cinp.getNamespace( self.uri )
 
     super().registerNamespace( path, namespace )
 

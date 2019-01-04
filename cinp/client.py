@@ -449,7 +449,7 @@ class CInP():
 
     Otherwise a file is created in target_dir, and the full path is returned.  If the
       filename is not specified by the server, and a random filename is chosen.
-      WARNING: there no checking done to make sure the target file does not allready
+      WARNING: there isn't checking done to make sure the target file does not allready
       exist, there is a possibility it could clober something that allready exists.
       we do make sure the filename fits a regex pattern that prevents it from escaping
       the target_dir.  The "filename" as sent by the server is the "model" of the uri.

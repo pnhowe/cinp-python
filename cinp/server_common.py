@@ -14,8 +14,11 @@ FIELD_TYPE_LIST = ( 'String', 'Integer', 'Float', 'Boolean', 'DateTime', 'Map', 
 
 
 class InvalidRequest( Exception ):
-  def __init__( self, message=None, data=None):
-    self.data = data or { 'message': message } or 'Unknown'
+  def __init__( self, message=None, data=None ):
+    try:
+      self.data = message.response_data
+    except AttributeError:
+      self.data = data or { 'message': str( message ) }
 
   def asResponse( self ):
     return Response( 400, data=self.data )
@@ -51,14 +54,39 @@ class NotAuthorized( Exception ):
   pass
 
 
-class AnonymouseUser():
+class AnonymousUser():
   @property
-  def isSuperuser( self ):
+  def is_superuser( self ):
     return False
 
   @property
-  def isAnonymouse( self ):
+  def is_anonymous( self ):
     return True
+
+
+def checkAuth_false( * args ):
+  return False
+
+
+def checkAuth_true( * args ):
+  return True
+
+
+def _debugDump( location, request, exception ):
+  import os
+  from datetime import datetime
+
+  try:
+    fp = open( os.path.join( location, datetime.utcnow().isoformat() ), 'w' )
+    fp.write( '** Request **\n' )
+    fp.write( str( request ) )
+    fp.write( '\n\n** Stack **\n' )
+    traceback.print_exception( None, exception, exception.__traceback__, file=fp )
+    fp.close()
+
+  except Exception as e:
+    import sys
+    sys.stderr.write( 'Error "{0}" when writing the debug dump'.format( e ) )
 
 
 def _dictConverter( value ):
@@ -598,7 +626,7 @@ class Model( Element ):
       try:
         result[ field_name ] = converter.fromPython( self.field_map[ field_name ], getattr( target_object, field_name ) )  # TODO: disguinsh between the AttributeError of looking up the field, and any errors pulling the field value might cause
       except ValueError as e:
-        raise ValueError( 'Error with "{0}": "{1}"'.format( field_name, str( e ) ) )
+        raise ValueError( 'Error with "{0}": "{1}"'.format( field_name, e ) )
       except AttributeError:
         raise ServerError( 'target_object("{0}") missing field "{1}"'.format( target_object.__class__.__name__, field_name ) )  # yes, internal server error, target_object comes from inside the house
 
@@ -638,6 +666,7 @@ class Model( Element ):
       position = int( header_map.get( 'POSITION', 0 ) )
     except ValueError:
       raise InvalidRequest( 'Count and Position must be integers if specified' )
+
     filter_values = {}
 
     if filter_name is not None:
@@ -655,7 +684,7 @@ class Model( Element ):
         try:
           filter_values[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
         except ValueError as e:
-          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( str( e ) )
+          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( e )
         except KeyError:
           error_map[ paramater_name ] = 'Required Paramater'
 
@@ -668,7 +697,7 @@ class Model( Element ):
       if isinstance( e.args[0], dict ):
         raise InvalidRequest( data=e.args[0] )
       else:
-        raise InvalidRequest( str( e ) )
+        raise InvalidRequest( e )
 
     if not isinstance( result, tuple ) and len( result ) != 3:
       raise ServerError( 'List result is not a valid tuple' )
@@ -710,7 +739,7 @@ class Model( Element ):
           value_map[ field_name ] = converter.toPython( field, data[ field_name ], transaction )
 
       except ValueError as e:
-        error_map[ field_name ] = 'Invalid Value "{0}"'.format( str( e ) )
+        error_map[ field_name ] = 'Invalid Value "{0}"'.format( e )
 
       except KeyError:
         if field.default is not None:
@@ -727,7 +756,7 @@ class Model( Element ):
       if isinstance( e.args[0], dict ):
         raise InvalidRequest( data=e.args[0] )
       else:
-        raise InvalidRequest( str( e ) )
+        raise InvalidRequest( e )
 
     if not isinstance( result, tuple ) and len( result ) != 2:
       raise ServerError( 'Create result is not a valid tuple' )
@@ -741,7 +770,7 @@ class Model( Element ):
         if isinstance( e.args[0], dict ):
           raise InvalidRequest( data=e.args[0] )
         else:
-          raise InvalidRequest( str( e ) )
+          raise InvalidRequest( e )
 
       if result is None:
         raise ServerError( 'Newly created object disapeared' )
@@ -758,7 +787,7 @@ class Model( Element ):
       if isinstance( e.args[0], dict ):
         raise InvalidRequest( data=e.args[0] )
       else:
-        raise InvalidRequest( str( e ) )
+        raise InvalidRequest( e )
 
     if result is None:
       raise ObjectNotFound( self.path, object_id )
@@ -789,7 +818,7 @@ class Model( Element ):
       try:
         value_map[ field_name ] = converter.toPython( field, data[ field_name ], transaction )
       except ValueError as e:
-        error_map[ field_name ] = 'Invalid Value "{0}"'.format( str( e ) )
+        error_map[ field_name ] = 'Invalid Value "{0}"'.format( e )
       except KeyError:
         pass
 
@@ -865,7 +894,7 @@ class Action( Element ):
         except KeyError:
           value_map[ paramater_name ] = paramater.default
         except ValueError as e:
-          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( str( e ) )
+          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( e )
 
     if error_map != {}:
       raise InvalidRequest( data=error_map )
@@ -882,7 +911,7 @@ class Action( Element ):
         else:
           result = converter.fromPython( self.return_paramater, self.func( self.parent._get( transaction, id_list[0] ), **value_map ) )
       except ValueError as e:
-        raise InvalidRequest( str( e ) )
+        raise InvalidRequest( e )
 
     else:
       if not self.static:
@@ -891,7 +920,7 @@ class Action( Element ):
       try:
         result = converter.fromPython( self.return_paramater, self.func( **value_map ) )
       except ValueError as e:
-        raise InvalidRequest( 'Invalid Result Value: "{0}"'.format( str( e ) ) )
+        raise InvalidRequest( 'Invalid Result Value: "{0}"'.format( e ) )
 
     return Response( 200, data=result, header_map={ 'Verb': 'CALL', 'Cache-Control': 'no-cache', 'Multi-Object': str( multi ) } )
 
@@ -903,17 +932,22 @@ class Action( Element ):
 
 
 class Server():
-  def __init__( self, root_path, root_version, debug=False, cors_allow_list=None ):
+  def __init__( self, root_path, root_version, debug=False, cors_allow_list=None, debug_dump_location=None ):
     super().__init__()
     self.uri = URI( root_path )
     self.debug = debug
+    self.debug_dump_location = debug_dump_location
     self.root_namespace = Namespace( name=None, version=root_version, root_path=root_path, converter=Converter( self.uri ) )
-    self.root_namespace.checkAuth = lambda user, verb, id_list: True
+    self.root_namespace.checkAuth = checkAuth_true
     self.cors_allow_list = cors_allow_list
     self.path_handlers = {}
 
   def getUser( self, auth_id, auth_token ):
-    raise ValueError( 'getUser not implemented' )
+    if auth_id is not None and auth_token is not None:
+      raise ValueError( 'getUser not implemented' )
+
+    else:
+      return AnonymousUser()
 
   def _validateModel( self, model ):
     for field_name in model.field_map:
@@ -986,10 +1020,13 @@ class Server():
           break
 
     except Exception as e:
+      if self.debug_dump_location is not None:
+        _debugDump( self.debug_dump_location, request, e )
+
       if self.debug:
-        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ), 'trace': traceback.format_exc() } )
+        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, e ), 'trace': traceback.format_exc() } )
       else:
-        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
+        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, e ) } )
 
     if response is None:
       try:
@@ -1008,14 +1045,17 @@ class Server():
         response = Response( 403, data={ 'message': 'Not Authorized' } )
 
       except Exception as e:
+        if self.debug_dump_location is not None:
+          _debugDump( self.debug_dump_location, request, e )
+
         if self.debug:
-          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ), 'trace': traceback.format_exc() } )
+          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, e ), 'trace': traceback.format_exc() } )
         else:
-          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, str( e ) ) } )
+          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, e ) } )
 
     else:
       if not isinstance( response, Response ):
-        response = Response( 500, data={ 'message': 'Path Handler Return an Invalid Response: ({0})"{1}"'.format( type( response ).__name__, str( response ) ) } )
+        response = Response( 500, data={ 'message': 'Path Handler Return an Invalid Response: ({0})"{1}"'.format( type( response ).__name__, response ) } )
 
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
     if self.cors_allow_list is not None:
@@ -1087,15 +1127,12 @@ class Server():
 
     auth_id = request.header_map.get( 'AUTH-ID', None )
     auth_token = request.header_map.get( 'AUTH-TOKEN', None )
-    if auth_id is not None and auth_token is not None:
-      user = self.getUser( auth_id, auth_token )
-      if user is None:
-        return Response( 401, data={ 'message': 'Invalid Session' } )
 
-    else:
-      user = AnonymouseUser()
+    user = self.getUser( auth_id, auth_token )
+    if user is None:
+      return Response( 401, data={ 'message': 'Invalid Session' } )
 
-    if not user.isSuperuser:
+    if not user.is_superuser:
       if not element.checkAuth( user, request.verb, id_list ):
         raise NotAuthorized()
 
@@ -1190,8 +1227,14 @@ class Request():
         self.data = None
         raise InvalidRequest( 'Error Parsing JSON Request data: "{0}"'.format( e ) )
 
-    def fromXML( self, buff ):
-      pass
+  def fromXML( self, buff ):
+    pass
+
+  def fromBytes( self, buff ):
+    pass
+
+  def __str__( self ):
+    return 'Request:\n  Verb: "{0}"\n  URI: "{1}"\n  Header Map: "{2}"\n  Data: "{3}"'.format( self.verb, self.uri, self.header_map, self.data )
 
 
 class Response():
@@ -1223,3 +1266,6 @@ class Response():
 
   def asBytes( self ):
     return None
+
+  def __str__( self ):
+    return 'Response:\n  Content Type: "{0}"\n  HTTP Code: "{1}"\n  Header Map: "{2}"\n  Data: "{3}"'.format( self.content_type, self.http_code, self.header_map, self.data )

@@ -7,13 +7,14 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError, AppRegis
 from django.db.models import fields
 from django.core.files import File
 
-from cinp.server_common import Converter, Namespace, Model, Action, Paramater, Field, ServerError
+from cinp.server_common import Converter, Namespace, Model, Action, Paramater, Field, ServerError, checkAuth_true, checkAuth_false
 
 __MODEL_REGISTRY__ = {}
 
 # TODO: take advantage of .save( update_fields=.... ) on UPDATE
 
 NEW_REMOTE_FIELD = int( django.get_version().split( '.' )[1] ) > 8  # last known (to me) use of related was 1.8
+HAS_VIEW_PERMISSION = int( django.get_version().split( '.' )[0] ) >= 2 and int( django.get_version().split( '.' )[1] ) >= 1
 
 
 def field_model_resolver( django_field ):
@@ -193,16 +194,16 @@ class DjangoCInP():
   # this is called to get the namespace to attach to the server
   def getNamespace( self, uri ):
     namespace = Namespace( name=self.name, version=self.version, doc=self.doc, converter=DjangoConverter( uri ) )
-    namespace.checkAuth = lambda user, verb, id_list: True
+    namespace.checkAuth = checkAuth_true
     for model in self.model_list:
       check_auth = self.check_auth_map.get( model.name, None )
       if check_auth is None:
-        check_auth = lambda user, verb, id_list, action=None: False
+        check_auth = checkAuth_false
 
       namespace.addElement( model )
       model.checkAuth = check_auth
       for action in self.action_map.get( model.name, [] ):
-        action.checkAuth = lambda user, verb, id_list: check_auth( user, verb, id_list, action )
+        action.checkAuth = eval( 'lambda user, verb, id_list: check_auth( user, verb, id_list, "{0}" )'.format( action.name ), { 'check_auth': check_auth } )  # TODO: eval ew, find a better way
         model.addAction( action )
 
     return namespace
@@ -425,6 +426,32 @@ class DjangoCInP():
       return func
 
     return decorator
+
+  @staticmethod
+  def basic_auth_check( user, verb, model ):
+    if verb in ( 'CALL', 'DESCRIBE' ):
+      return True
+
+    app = model._meta.app_label
+    model = model._meta.model_name
+
+    if verb in ( 'GET', 'LIST' ):
+      if HAS_VIEW_PERMISSION:
+        if user.has_perm( '{0}.view_{1}'.format( app, model ) ):
+          return True
+      else:
+        return True
+
+    if verb == 'CREATE' and user.has_perm( '{0}.add_{1}'.format( app, model ) ):
+      return True
+
+    if verb == 'UPDATE' and user.has_perm( '{0}.change_{1}'.format( app, model ) ):
+      return True
+
+    if verb == 'DELETE' and user.has_perm( '{0}.delete_{1}'.format( app, model ) ):
+      return True
+
+    return False
 
   def list_filter( self, name, paramater_type_list=None ):
     def decorator( func ):

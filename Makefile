@@ -17,6 +17,7 @@ clean:
 	$(RM) -fr build
 	$(RM) -f dpkg
 	$(RM) -f rpm
+	$(RM) -fr htmlcov
 ifeq (ubuntu, $(DISTRO))
 	dh_clean || true
 endif
@@ -66,7 +67,7 @@ dpkg-file:
 .PHONY:: dpkg-distros dpkg-requires dpkg-setup dpkg-file
 
 rpm-distros:
-	echo centos-6
+	echo centos-6 centos-7
 
 rpm-requires:
 	echo python34 rpm-build
