@@ -20,7 +20,7 @@ class build( build_py ):
 
 
 setup( name='cinp',
-       version='0.10.1',
+       version='0.10.2',
        description='CInP, Concise Interaction Protocol',
        long_description="""A HTTP/JSON Protocol that brings some of the
 flexability of REST, but extends beyond CRUD to support Metod Calling and
@@ -37,7 +37,6 @@ the Business Logic and permissions to be fully encapsulated on the Server.""",
            'License :: OSI Approved :: Apache Software License',
            'Programming Language :: Python :: 3',
            'Programming Language :: Python :: 3.4'
-           'Programming Language :: Python :: 3.6'
        ],
        packages=[ 'cinp' ],
        cmdclass={ 'build_py': build }
