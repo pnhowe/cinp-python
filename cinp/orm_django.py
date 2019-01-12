@@ -183,6 +183,7 @@ class DjangoCInP():
     super().__init__()
     if not re.match( '^[0-9a-zA-Z]*$', name ):
       raise ValueError( 'name "{0}" is invalid'.format( name ) )
+
     self.name = name
     self.version = version
     self.doc = doc
