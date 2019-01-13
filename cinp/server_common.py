@@ -889,6 +889,7 @@ class Action( Element ):
     return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Action', 'Cache-Control': 'max-age=0' } )
 
   def call( self, converter, transaction, id_list, data, user, multi ):
+    #  TODO: deal with data when None, and in other places
     error_map = {}
     value_map = {}
     for paramater_name in self.paramater_map:  # should we be ignorning data?
