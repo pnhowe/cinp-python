@@ -123,7 +123,7 @@ class CInP():
       header_map[ 'Content-Type' ] = 'application/octet-stream'
       if not hasattr( data, 'read' ):
         raise InvalidRequest( 'data must be an readable stream' )
-      verb = 'POST'  # not to be handled by CInP on the other end, but by a bolt on file upload handler
+      verb = 'POST'  # not to be handled by CInP on the other end, but by a file upload handler
 
     else:
       header_map[ 'Content-Type' ] = 'application/json;charset=utf-8'

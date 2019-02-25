@@ -13,6 +13,14 @@ __MULTI_URI_MAX__ = 100
 FIELD_TYPE_LIST = ( 'String', 'Integer', 'Float', 'Boolean', 'DateTime', 'Map', 'Model', 'File' )
 
 
+class Notset:
+  def __str__( self ):
+    return "<NOTSET>"
+
+
+notset = Notset()
+
+
 class InvalidRequest( Exception ):
   def __init__( self, message=None, data=None ):
     try:
@@ -336,7 +344,7 @@ class Converter():
 
 
 class Paramater():
-  def __init__( self, type, name=None, is_array=False, doc=None, length=None, model=None, model_resolve=None, choice_list=None, default=None, allowed_scheme_list=None ):
+  def __init__( self, type, name=None, is_array=False, doc=None, length=None, model=None, model_resolve=None, choice_list=None, default=notset, allowed_scheme_list=None ):
     super().__init__()
     self.name = name
     self.doc = doc
@@ -378,7 +386,7 @@ class Paramater():
     if self.doc is not None:
       result[ 'doc' ] = self.doc
 
-    if self.type == 'String':
+    if self.type == 'String' and self.length is not None:
       result[ 'length' ] = self.length
 
     if self.type == 'Model':
@@ -392,7 +400,7 @@ class Paramater():
         result[ 'choices' ] = self.choice_list
       if self.is_array:
         result[ 'is_array' ] = True
-      if self.default is not None:
+      if self.default is not notset:
         result[ 'default' ] = self.default
 
     return result
@@ -717,6 +725,7 @@ class Model( Element ):
     value_map = {}
     update_value_map = {}
     error_map = {}
+
     for field_name in data:  # first make sure the fields are ok to look at
       try:
         field = self.field_map[ field_name ]
@@ -742,7 +751,7 @@ class Model( Element ):
         error_map[ field_name ] = 'Invalid Value "{0}"'.format( e )
 
       except KeyError:
-        if field.default is not None:
+        if field.default is not notset:
           value_map[ field_name ] = field.default
         elif field.required:
           error_map[ field_name ] = 'Required Field'
@@ -881,6 +890,7 @@ class Action( Element ):
     return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Action', 'Cache-Control': 'max-age=0' } )
 
   def call( self, converter, transaction, id_list, data, user, multi ):
+    #  TODO: deal with data when None, and in other places
     error_map = {}
     value_map = {}
     for paramater_name in self.paramater_map:  # should we be ignorning data?
@@ -892,7 +902,11 @@ class Action( Element ):
         try:
           value_map[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
         except KeyError:
-          value_map[ paramater_name ] = paramater.default
+          if paramater.default is not notset:
+            value_map[ paramater_name ] = paramater.default
+          else:
+            error_map[ paramater_name ] = 'Required Paramater'
+
         except ValueError as e:
           error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( e )
 

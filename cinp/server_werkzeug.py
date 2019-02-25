@@ -29,6 +29,9 @@ class WerkzeugServer( Server ):
 
       return WerkzeugResponse( response ).buildNativeResponse()
 
+    except InvalidRequest as e:
+      return WerkzeugResponse( e.asResponse() ).buildNativeResponse()
+
     except Exception as e:
       logging.exception( 'Top level Exception, "{0}"({1})'.format( e, type( e ).__name__ ) )
       return werkzeug.wrappers.BaseResponse( response='Error getting WerkzeugResponse, "{0}"({1})'.format( e, type( e ).__name__ ), status=500, content_type='text/plain' )
