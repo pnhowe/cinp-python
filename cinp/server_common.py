@@ -725,6 +725,7 @@ class Model( Element ):
     value_map = {}
     update_value_map = {}
     error_map = {}
+
     for field_name in data:  # first make sure the fields are ok to look at
       try:
         field = self.field_map[ field_name ]

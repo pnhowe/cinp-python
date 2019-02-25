@@ -20,7 +20,7 @@ class build( build_py ):
 
 
 setup( name='cinp',
-       version='0.10.2',
+       version='0.10.3',
        description='CInP, Concise Interaction Protocol',
        long_description="""A HTTP/JSON Protocol that brings some of the
 flexability of REST, but extends beyond CRUD to support Metod Calling and
