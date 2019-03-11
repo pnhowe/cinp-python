@@ -1,7 +1,7 @@
 import re
 import random
 import django
-from django.db import DatabaseError, models
+from django.db import DatabaseError, models, transaction
 from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist, ValidationError, AppRegistryNotReady
 from django.db.models import fields
@@ -492,8 +492,10 @@ class DjangoTransaction():
   def get( self, model, object_id ):
     try:
       return model._django_model.objects.get( pk=object_id )
+
     except ObjectDoesNotExist:
       return None
+
     except ValueError:
       return None  # an invalid pk is indeed 404
 
@@ -553,8 +555,11 @@ class DjangoTransaction():
     target_object.delete()
     return True
 
+  def start( self ):
+    transaction.set_autocommit( False )
+
   def commit( self ):
-    pass
+    transaction.commit()
 
   def abort( self ):
-    pass
+    transaction.rollback()

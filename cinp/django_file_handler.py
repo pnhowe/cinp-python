@@ -45,6 +45,9 @@ def _localFileReader( refname ):
 
 
 def _localFileWriter( origional_filename ):
+  if not os.path.exists( FILE_STORAGE ):
+    os.makedirs( FILE_STORAGE )
+
   writer = tempfile.NamedTemporaryFile( mode='wb', prefix='', dir=FILE_STORAGE, delete=False )
   filename = writer.name
 

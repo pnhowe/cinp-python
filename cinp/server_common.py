@@ -1161,6 +1161,8 @@ class Server():
       transaction = element.transaction_class()
       converter = element.parent.converter
 
+    transaction.start()
+
     try:
       if request.verb == 'GET':
         result = element.get( converter, transaction, id_list, multi )

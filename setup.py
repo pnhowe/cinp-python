@@ -3,6 +3,7 @@
 import os
 from distutils.core import setup
 from distutils.command.build_py import build_py
+from cinp.client import __CLIENT_VERSION__
 
 
 class build( build_py ):
@@ -20,7 +21,7 @@ class build( build_py ):
 
 
 setup( name='cinp',
-       version='0.10.3',
+       version=__CLIENT_VERSION__,
        description='CInP, Concise Interaction Protocol',
        long_description="""A HTTP/JSON Protocol that brings some of the
 flexability of REST, but extends beyond CRUD to support Metod Calling and
