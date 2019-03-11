@@ -8,7 +8,7 @@ from urllib import request
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '0.9.8'
+__CLIENT_VERSION__ = '0.11.1'
 __CINP_VERSION__ = '0.9'
 
 __all__ = [ 'Timeout', 'ResponseError', 'InvalidRequest', 'InvalidSession',

@@ -74,6 +74,9 @@ class TestTransaction():
     else:
       return True
 
+  def start( self ):
+    pass
+
   def commit( self ):
     pass
 
@@ -266,9 +269,9 @@ def test_action():
   ns.addElement( model )
 
   action1 = Action( name='act1', return_paramater=Paramater( type='String' ), func=fake_func )
-  assert sort_dsc( action1.describe().data ) == { 'name': 'act1', 'return-type': { 'type': 'String', 'length': None }, 'paramaters': [], 'static': True, 'path': None, 'doc': '' }
+  assert sort_dsc( action1.describe().data ) == { 'name': 'act1', 'return-type': { 'type': 'String' }, 'paramaters': [], 'static': True, 'path': None, 'doc': '' }
   model.addAction( action1 )
-  assert sort_dsc( action1.describe().data ) == { 'name': 'act1', 'return-type': { 'type': 'String', 'length': None }, 'paramaters': [], 'static': True, 'path': '/api/model1(act1)', 'doc': '' }
+  assert sort_dsc( action1.describe().data ) == { 'name': 'act1', 'return-type': { 'type': 'String' }, 'paramaters': [], 'static': True, 'path': '/api/model1(act1)', 'doc': '' }
 
   action2 = Action( name='act2', return_paramater=Paramater( type='Integer' ), static=False, func=fake_func )
   assert sort_dsc( action2.describe().data ) == { 'name': 'act2', 'return-type': { 'type': 'Integer' }, 'paramaters': [], 'static': False, 'path': None, 'doc': '' }
