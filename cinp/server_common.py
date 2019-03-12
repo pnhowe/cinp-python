@@ -97,9 +97,39 @@ def _debugDump( location, request, exception ):
     sys.stderr.write( 'Error "{0}" when writing the debug dump'.format( e ) )
 
 
-def _dictConverter( value ):
-  _fromPythonMap( value )
+def _fromPythonMap_converter( value ):
+  try:
+    return MAP_TYPE_CONVERTER[ type( value ).__name__ ]( value )
+  except KeyError:
+    try:
+      return str( value )
+    except Exception:
+      raise ValueError( 'unable to convert type "{0}" in map converter'.format( type( value ).__name__ ) )
+
+
+def _fromPythonList( value ):
+  for index in range( 0, len( value ) ):
+    value[ index ] = _fromPythonMap_converter( value[ index ] )
+
   return value
+
+
+def _fromPythonMap( value ):
+  for key in value.keys():
+    if isinstance( value[ key ], dict ):
+      value[ key ] = _fromPythonMap( value[ key ] )
+
+    elif isinstance( value[ key ], list ):
+      value[ key ] = _fromPythonList( value[ key ] )
+
+    elif isinstance( value[ key ], tuple ):
+      value[ key ] = _fromPythonList( list( value[ key ] ) )
+
+    else:
+      value[ key ] = _fromPythonMap_converter( value[ key ] )
+
+  return value
+
 
 MAP_TYPE_CONVERTER = {
                        'NoneType': lambda a: None,
@@ -109,31 +139,9 @@ MAP_TYPE_CONVERTER = {
                        'bool': lambda a: True if a else False,
                        'datetime': lambda a: a.isoformat(),
                        'timedelta': lambda a: a.total_seconds(),
-                       'dict': _dictConverter
+                       'dict': _fromPythonMap,
+                       'list': _fromPythonList
                      }
-
-
-def _fromPythonMap_converter( value ):
-  try:
-    return MAP_TYPE_CONVERTER[ type( value ).__name__ ]( value )
-  except KeyError:
-    raise ValueError( 'no converter for type "{0}" in map converter'.format( type( value ).__name__ ) )
-
-
-def _fromPythonMap( value ):
-  for key in value.keys():
-    if isinstance( value[ key ], tuple ):  # convert tuple to list before iterating
-      value[ key ] = list( value[ key ] )
-
-    if isinstance( value[ key ], dict ):
-      _fromPythonMap( value[ key ] )
-
-    elif isinstance( value[ key ], list ):
-      for index in range( 0, len( value[ key ] ) ):
-        value[ key ][ index ] = _fromPythonMap_converter( value[ key ][ index ] )
-
-    else:
-      value[ key ] = _fromPythonMap_converter( value[ key ] )
 
 
 class Converter():
