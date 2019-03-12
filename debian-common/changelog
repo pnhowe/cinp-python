@@ -1,3 +1,9 @@
+cinp (0.11.1-1) DIST; urgency=medium
+
+  * Real transacations for Django
+
+ -- Peter Howe <pnhowe@gmail.com>  Mon, 11 Mar 2019 09:21:00 -0600
+
 cinp (0.10.3-1) DIST; urgency=medium
 
   * updates to follow pypi
