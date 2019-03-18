@@ -157,6 +157,9 @@ class NullTransaction():
   def delete( self, model, object_id ):
     return False
 
+  def start( self ):
+    pass
+
   def commit( self ):
     pass
 
