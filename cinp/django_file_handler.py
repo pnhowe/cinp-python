@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from cinp.server_common import Response, InvalidRequest
 from cinp.readers import READER_REGISTRY
 
-FILE_STORAGE = '/tmp/djanog_file_handler/'
+FILE_STORAGE = '/tmp/django_file_handler/'
 FILE_TTL = timedelta( hours=2 )
 CHUNK_SIZE = 4096 * 1024
 INLINE_CONTENT_DISPOSITION = re.compile( '^inline: filename="([a-zA-Z0-9_\-\. ]+)"$' )
