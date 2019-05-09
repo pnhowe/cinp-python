@@ -2,13 +2,14 @@ import os
 import socket
 import json
 import logging
+import http.client
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 from urllib import request
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '0.11.2'
+__CLIENT_VERSION__ = '0.11.4'
 __CINP_VERSION__ = '0.9'
 
 __all__ = [ 'Timeout', 'ResponseError', 'InvalidRequest', 'InvalidSession',
@@ -43,11 +44,6 @@ class ServerError( Exception ):
   pass
 
 
-class HTTPErrorProcessorPassthrough( request.HTTPErrorProcessor ):
-  def http_response( self, request, response ):
-    return response
-
-
 class CInP():
   def __init__( self, host, root_path, proxy=None ):
     super().__init__()
@@ -64,10 +60,18 @@ class CInP():
 
     self.uri = URI( root_path )
 
+    self.opener = request.OpenerDirector()
+
     if self.proxy:  # not doing 'is not None', so empty strings don't try and proxy   # have a proxy option to take it from the envrionment vars
-      self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( { 'http': self.proxy, 'https': self.proxy } ) )
+      self.opener.add_handler( request.ProxyHandler( { 'http': self.proxy, 'https': self.proxy } ) )
     else:
-      self.opener = request.build_opener( HTTPErrorProcessorPassthrough, request.ProxyHandler( {} ) )
+      self.opener.add_handler( request.ProxyHandler( {} ) )
+
+    self.opener.add_handler( request.HTTPHandler() )
+    if hasattr( http.client, 'HTTPSConnection' ):
+      self.opener.add_handler( request.HTTPSHandler() )
+
+    self.opener.add_handler( request.UnknownHandler() )
 
     self.opener.addheaders = [
                                 ( 'User-Agent', 'python CInP client {0}'.format( __CLIENT_VERSION__ ) ),
@@ -134,8 +138,7 @@ class CInP():
         data = json.dumps( data, default=JSONDefault ).encode( 'utf-8' )
 
     url = '{0}{1}'.format( self.host, uri )
-    req = request.Request( url, data=data, headers=header_map )
-    req.get_method = lambda: verb
+    req = request.Request( url, data=data, headers=header_map, method=verb )
     try:
       resp = self.opener.open( req, timeout=timeout )
 

@@ -121,6 +121,11 @@ def paramater_type_to_kwargs( paramater_type ):
       pass
 
     try:
+      result[ 'choice_list' ] = paramater_type[ 'choice_list' ]
+    except KeyError:
+      pass
+
+    try:
       result[ 'allowed_scheme_list' ] = paramater_type[ 'allowed_scheme_list' ]
     except KeyError:
       pass
