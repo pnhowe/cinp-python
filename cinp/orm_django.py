@@ -247,14 +247,10 @@ class DjangoCInP():
                    'default': django_field.default if django_field.default != fields.NOT_PROVIDED else None
                  }
 
-        if callable( kwargs[ 'default' ] ):  # not something we can serilize and send over the wire, would be good to send the other end something however.
-          kwargs[ 'default' ] = None
-
         if django_field.editable and django_field.name not in read_only_list_:
           kwargs[ 'mode' ] = 'RC' if django_field.primary_key else 'RW'
         else:
           kwargs[ 'mode' ] = 'RO'
-          kwargs[ 'default' ] = None
 
         internal_type = django_field.get_internal_type()
         try:
@@ -565,6 +561,8 @@ class DjangoTransaction():
 
   def commit( self ):
     transaction.commit()
+    transaction.set_autocommit( True )
 
   def abort( self ):
     transaction.rollback()
+    transaction.set_autocommit( True )
