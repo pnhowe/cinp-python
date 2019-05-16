@@ -9,7 +9,9 @@ __pycache__
 /cinp.egg-info
 MANIFEST
 dpkg
+dpkg-setup
 rpm
+rpm-setup
 
 # test/lint output/temp stuff
 htmlcov
