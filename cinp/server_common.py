@@ -389,7 +389,7 @@ class Paramater():
       self.choice_list = choice_list
       self.default = default
 
-  def describe( self ):
+  def describe( self, converter ):
     result = { 'name': self.name, 'type': self.type }
     if self.doc is not None:
       result[ 'doc' ] = self.doc
@@ -409,7 +409,10 @@ class Paramater():
       if self.is_array:
         result[ 'is_array' ] = True
       if self.default is not notset:
-        result[ 'default' ] = self.default
+        if callable( self.default ):
+          result[ 'default' ] = '<callable "{0}">'.format( self.default.__name__ )
+        else:
+          result[ 'default' ] = converter.fromPython( self, self.default )
 
     return result
 
@@ -423,8 +426,8 @@ class Field( Paramater ):
     self.mode = mode
     self.required = required
 
-  def describe( self ):
-    result = super().describe()
+  def describe( self, converter ):
+    result = super().describe( converter )
     result[ 'mode' ] = self.mode
     result[ 'required' ] = self.required
 
@@ -450,7 +453,7 @@ class Element():
   def startTransaction( self ):
     raise InvalidRequest( 'No Transaction to start' )
 
-  def describe( self ):
+  def describe( self, converter ):
     raise InvalidRequest( 'Not DESCRIBE able' )
 
   def get( self, converter, transaction, id_list, multi ):
@@ -535,7 +538,7 @@ class Namespace( Element ):
     element.parent = self
     self.element_map[ element.name ] = element
 
-  def describe( self ):
+  def describe( self, converter ):
     data = { 'name': self.name, 'path': self.path, 'api-version': self.version, 'multi-uri-max': __MULTI_URI_MAX__, 'doc': self.doc }
     namespace_list = []
     model_list = []
@@ -610,17 +613,17 @@ class Model( Element ):
     action.parent = self
     self.action_map[ action.name ] = action
 
-  def describe( self ):
+  def describe( self, converter ):
     data = { 'name': self.name, 'path': self.path, 'doc': self.doc }
     data[ 'constants' ] = {}
     for name in self.constant_set_map:
       data[ 'constants' ][ name ] = self.constant_set_map[ name ]
-    data[ 'fields' ] = [ item.describe() for item in self.field_map.values() ]
+    data[ 'fields' ] = [ item.describe( converter ) for item in self.field_map.values() ]
     data[ 'actions' ] = [ item.path for item in self.action_map.values() ]
     data[ 'not-allowed-metods' ] = self.not_allowed_verb_list
     data[ 'list-filters' ] = {}
     for name in self.list_filter_map:
-      data[ 'list-filters' ][ name ] = [ item.describe() for item in self.list_filter_map[ name ].values() ]
+      data[ 'list-filters' ][ name ] = [ item.describe( converter ) for item in self.list_filter_map[ name ].values() ]
 
     return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Model', 'Cache-Control': 'max-age=0' } )
 
@@ -760,7 +763,11 @@ class Model( Element ):
 
       except KeyError:
         if field.default is not notset:
-          value_map[ field_name ] = field.default
+          if callable( field.default ):
+            value_map[ field_name ] = field.default()
+          else:
+            value_map[ field_name ] = field.default
+
         elif field.required:
           error_map[ field_name ] = 'Required Field'
 
@@ -889,11 +896,11 @@ class Action( Element ):
 
     return '{0}({1})'.format( self.parent.path, self.name )
 
-  def describe( self ):
-    return_type = self.return_paramater.describe()
+  def describe( self, converter ):
+    return_type = self.return_paramater.describe( converter )
     del return_type[ 'name' ]
     data = { 'name': self.name, 'path': self.path, 'doc': self.doc, 'return-type': return_type, 'static': self.static }
-    data[ 'paramaters' ] = [ item.describe() for item in self.paramater_map.values() if item.type != '_USER_' ]
+    data[ 'paramaters' ] = [ item.describe( converter ) for item in self.paramater_map.values() if item.type != '_USER_' ]
 
     return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Action', 'Cache-Control': 'max-age=0' } )
 
@@ -911,7 +918,11 @@ class Action( Element ):
           value_map[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
         except KeyError:
           if paramater.default is not notset:
-            value_map[ paramater_name ] = paramater.default
+            if callable( paramater.default ):
+              value_map[ paramater_name ] = paramater.default()
+            else:
+              value_map[ paramater_name ] = paramater.default
+
           else:
             error_map[ paramater_name ] = 'Required Paramater'
 
@@ -1158,20 +1169,26 @@ class Server():
       if not element.checkAuth( user, request.verb, id_list ):
         raise NotAuthorized()
 
-    if request.verb == 'DESCRIBE':
-      return element.describe()
-
-    result = None
     if isinstance( element, Action ):
       transaction = element.parent.transaction_class()
       converter = element.parent.parent.converter
-    else:
+    elif isinstance( element, Model ):
       transaction = element.transaction_class()
       converter = element.parent.converter
+    else:
+      transaction = None  # do not need a transaction anyway
+      converter = element.converter
 
-    transaction.start()
+    if request.verb == 'DESCRIBE':
+      return element.describe( converter )
 
+    result = None
     try:
+      in_transaction = False
+      if request.verb in ( 'CREATE', 'UPDATE', 'DELETE', 'CALL' ):
+        transaction.start()
+        in_transaction = True
+
       if request.verb == 'GET':
         result = element.get( converter, transaction, id_list, multi )
 
@@ -1196,14 +1213,17 @@ class Server():
         result = element.call( converter, transaction, id_list, request.data, user, multi )
 
     except Exception as e:
-      transaction.abort()
+      if in_transaction:
+        transaction.abort()
       raise e
 
     if result is None:
-      transaction.abort()
+      if in_transaction:
+        transaction.abort()
       return Response( 500, 'Confused, verb "{0}"'.format( request.verb ) )
 
-    transaction.commit()
+    if in_transaction:
+      transaction.commit()
     return result
 
   def registerNamespace( self, path, namespace ):

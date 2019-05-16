@@ -74,7 +74,13 @@ rpm-distros:
 	echo centos-6 centos-7
 
 rpm-requires:
-	echo python34 rpm-build
+	echo rpm-build
+ifeq (centos, $(DISTRO))
+ifeq (6, $(DISTRO_MAJOR_VERSION))
+	echo python34-setuptools
+endif
+endif
+	echo python36-setuptools
 
 rpm-setup:
 	./rpmbuild-setup
