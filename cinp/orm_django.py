@@ -99,7 +99,10 @@ def property_model_resolver( model_name ):
   return ( None, None, model )
 
 
-def paramater_type_to_kwargs( paramater_type ):
+def paramater_type_to_paramater( paramater_type, extra=None ):
+  if paramater_type is None:
+    return None
+
   result = {}
 
   if isinstance( paramater_type, dict ):
@@ -143,7 +146,10 @@ def paramater_type_to_kwargs( paramater_type ):
   else:
     result[ 'type' ] = paramater_type
 
-  return result
+  if extra is not None:
+    result.update( extra )
+
+  return Paramater( **result )
 
 
 class DjangoConverter( Converter ):
@@ -398,14 +404,13 @@ class DjangoCInP():
 
       paramater_list = []
       for index in range( 0, len( paramater_type_list_ ) ):
-        kwargs = paramater_type_to_kwargs( paramater_type_list_[ index ] )
-        kwargs[ 'name' ] = paramater_name_list[ index ]
+        extra = { 'name': paramater_name_list[ index ] }
         if index >= default_offset:
-          kwargs[ 'default' ] = default_list[ index - default_offset ]
+          extra[ 'default' ] = default_list[ index - default_offset ]
 
-        paramater_list.append( Paramater( **kwargs ) )
+        paramater_list.append( paramater_type_to_paramater( paramater_type_list_[ index ], extra ) )
 
-      return_paramater = Paramater( **paramater_type_to_kwargs( return_type ) )
+      return_paramater = paramater_type_to_paramater( return_type )
 
       try:
         doc = func.__doc__.strip()
@@ -473,10 +478,7 @@ class DjangoCInP():
 
       paramater_map = {}
       for index in range( 0, len( paramater_type_list_ ) ):
-        kwargs = paramater_type_to_kwargs( paramater_type_list_[ index ] )
-        kwargs[ 'name' ] = paramater_name_list[ index ]
-
-        paramater = Paramater( **kwargs )
+        paramater = paramater_type_to_paramater( paramater_type_list_[ index ], { 'name': paramater_name_list[ index ] } )
         paramater_map[ paramater.name ] = paramater
 
       self.list_filter_map[ model_name ][ name ] = ( func.__func__, paramater_map )

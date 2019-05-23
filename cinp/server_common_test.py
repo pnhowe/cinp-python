@@ -131,7 +131,7 @@ def checkAuth( user, verb, id_list ):
 
 def test_namespace():
   ns = Namespace( name=None, version='0.0', root_path='/api/', converter=None )
-  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
+  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
 
   with pytest.raises( ValueError ):
     Namespace( name='root', version='0.0', converter=None )
@@ -143,31 +143,31 @@ def test_namespace():
     Namespace( name=None, version='0.0', root_path='/asd', converter=None )
 
   ns2 = Namespace( name='ns2', version='2.0', converter=None )
-  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': None, 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
+  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': None, 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
   ns.addElement( ns2 )
-  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/' ], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
+  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/' ], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
 
   ns3 = Namespace( name='ns3', version='3.0', converter=None )
-  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/' ], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns3.describe( ns3.converter ).data ) == { 'name': 'ns3', 'path': None, 'api-version': '3.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
+  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/' ], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns3.describe( ns3.converter ).data ) == { 'name': 'ns3', 'path': None, 'api-version': '3.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
   ns.addElement( ns3 )
-  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/', '/api/ns3/' ], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns3.describe( ns3.converter ).data ) == { 'name': 'ns3', 'path': '/api/ns3/', 'api-version': '3.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
+  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/', '/api/ns3/' ], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns3.describe( ns3.converter ).data ) == { 'name': 'ns3', 'path': '/api/ns3/', 'api-version': '3.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
 
-  ns2_1 = Namespace( name='ns2_1', version='2.1', converter=None )
-  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/', '/api/ns3/' ], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns3.describe( ns3.converter ).data ) == { 'name': 'ns3', 'path': '/api/ns3/', 'api-version': '3.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns2_1.describe( ns2_1.converter ).data ) == { 'name': 'ns2_1', 'path': None, 'api-version': '2.1', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
+  ns2_1 = Namespace( name='ns2_1', version='2.1', converter=None, doc='stuff' )
+  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/', '/api/ns3/' ], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns3.describe( ns3.converter ).data ) == { 'name': 'ns3', 'path': '/api/ns3/', 'api-version': '3.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns2_1.describe( ns2_1.converter ).data ) == { 'name': 'ns2_1', 'path': None, 'api-version': '2.1', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': 'stuff' }
   ns2.addElement( ns2_1 )
-  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/', '/api/ns3/' ], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [ '/api/ns2/ns2_1/' ], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns3.describe( ns3.converter ).data ) == { 'name': 'ns3', 'path': '/api/ns3/', 'api-version': '3.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( ns2_1.describe( ns2_1.converter ).data ) == { 'name': 'ns2_1', 'path': '/api/ns2/ns2_1/', 'api-version': '2.1', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
+  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns2/', '/api/ns3/' ], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns2.describe( ns2.converter ).data ) == { 'name': 'ns2', 'path': '/api/ns2/', 'api-version': '2.0', 'namespaces': [ '/api/ns2/ns2_1/' ], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns3.describe( ns3.converter ).data ) == { 'name': 'ns3', 'path': '/api/ns3/', 'api-version': '3.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( ns2_1.describe( ns2_1.converter ).data ) == { 'name': 'ns2_1', 'path': '/api/ns2/ns2_1/', 'api-version': '2.1', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': 'stuff' }
 
   assert ns.describe( ns.converter ).header_map == { 'Cache-Control': 'max-age=0', 'Verb': 'DESCRIBE', 'Type': 'Namespace' }
 
@@ -238,24 +238,24 @@ def test_model():
   ns = Namespace( name=None, version='0.0', root_path='/api/', converter=None )
 
   model1 = Model( name='model1', transaction_class=TestTransaction, field_list=[] )
-  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( model1.describe( ns.converter ).data ) == { 'name': 'model1', 'path': None, 'fields': [], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
+  assert sort_dsc( model1.describe( ns.converter ).data ) == { 'name': 'model1', 'path': None, 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
   ns.addElement( model1 )
-  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1' ], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1' ], 'multi-uri-max': 100 }
+  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
 
   field_list = []
   field_list.append( Field( name='field1', type='String', length=50 ) )
   field_list.append( Field( name='field2', type='Integer', mode='RO' ) )
 
   model2 = Model( name='model2', transaction_class=TestTransaction, field_list=field_list )
-  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1' ], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
-  assert sort_dsc( model2.describe( ns.converter ).data ) == { 'name': 'model2', 'path': None, 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True, }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1' ], 'multi-uri-max': 100 }
+  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( model2.describe( ns.converter ).data ) == { 'name': 'model2', 'path': None, 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True, }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
   ns.addElement( model2 )
-  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1', '/api/model2' ], 'multi-uri-max': 100, 'doc': '' }
-  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
-  assert sort_dsc( model2.describe( model2.parent.converter ).data ) == { 'name': 'model2', 'path': '/api/model2', 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1', '/api/model2' ], 'multi-uri-max': 100 }
+  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
+  assert sort_dsc( model2.describe( model2.parent.converter ).data ) == { 'name': 'model2', 'path': '/api/model2', 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] }
 
   assert model2.describe( model2.parent.converter ).header_map == { 'Cache-Control': 'max-age=0', 'Verb': 'DESCRIBE', 'Type': 'Model' }
 
@@ -269,16 +269,16 @@ def test_action():
   ns.addElement( model )
 
   action1 = Action( name='act1', return_paramater=Paramater( type='String' ), func=fake_func )
-  assert sort_dsc( action1.describe( ns.converter ).data ) == { 'name': 'act1', 'return-type': { 'type': 'String' }, 'paramaters': [], 'static': True, 'path': None, 'doc': '' }
+  assert sort_dsc( action1.describe( ns.converter ).data ) == { 'name': 'act1', 'return-type': { 'type': 'String' }, 'paramaters': [], 'static': True, 'path': None }
   model.addAction( action1 )
-  assert sort_dsc( action1.describe( action1.parent.parent.converter ).data ) == { 'name': 'act1', 'return-type': { 'type': 'String' }, 'paramaters': [], 'static': True, 'path': '/api/model1(act1)', 'doc': '' }
+  assert sort_dsc( action1.describe( action1.parent.parent.converter ).data ) == { 'name': 'act1', 'return-type': { 'type': 'String' }, 'paramaters': [], 'static': True, 'path': '/api/model1(act1)' }
 
   action2 = Action( name='act2', return_paramater=Paramater( type='Integer' ), static=False, func=fake_func )
-  assert sort_dsc( action2.describe( ns.converter ).data ) == { 'name': 'act2', 'return-type': { 'type': 'Integer' }, 'paramaters': [], 'static': False, 'path': None, 'doc': '' }
+  assert sort_dsc( action2.describe( ns.converter ).data ) == { 'name': 'act2', 'return-type': { 'type': 'Integer' }, 'paramaters': [], 'static': False, 'path': None }
 
   action3 = Action( name='act3', return_paramater=Paramater( type='Boolean' ), paramater_list=[ Paramater( name='bob', type='Float' ) ], static=False, func=fake_func )
   model.addAction( action3 )
-  assert sort_dsc( action3.describe( action3.parent.parent.converter ).data ) == { 'name': 'act3', 'return-type': { 'type': 'Boolean' }, 'paramaters': [ { 'name': 'bob', 'type': 'Float' } ], 'static': False, 'path': '/api/model1(act3)', 'doc': '' }
+  assert sort_dsc( action3.describe( action3.parent.parent.converter ).data ) == { 'name': 'act3', 'return-type': { 'type': 'Boolean' }, 'paramaters': [ { 'name': 'bob', 'type': 'Float' } ], 'static': False, 'path': '/api/model1(act3)' }
 
   assert action3.describe( action3.parent.parent.converter ).header_map == { 'Cache-Control': 'max-age=0', 'Verb': 'DESCRIBE', 'Type': 'Action' }
 
@@ -639,7 +639,7 @@ def test_server():
   assert res.data == { 'message': 'Invalid CInP Protocol Version' }
 
   path = '/api/'
-  desc_ref = sort_dsc( { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns1/', '/api/ns2/' ], 'models': [], 'multi-uri-max': 100, 'doc': '' } )
+  desc_ref = sort_dsc( { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns1/', '/api/ns2/' ], 'models': [], 'multi-uri-max': 100 } )
   assert sort_dsc( server.root_namespace.getElement( server.uri.split( path ) ).describe( ns1.converter ).data ) == desc_ref
   req = Request( 'DESCRIBE', path, { 'CINP-VERSION': __CINP_VERSION__ } )
   res = server.handle( req )
@@ -648,7 +648,7 @@ def test_server():
   assert res.header_map == { 'Type': 'Namespace', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '0.9' }
 
   path = '/api/ns1/'
-  desc_ref = sort_dsc( { 'name': 'ns1', 'path': '/api/ns1/', 'api-version': '0.1', 'namespaces': [], 'models': [ '/api/ns1/model1', '/api/ns1/model2' ], 'multi-uri-max': 100, 'doc': '' } )
+  desc_ref = sort_dsc( { 'name': 'ns1', 'path': '/api/ns1/', 'api-version': '0.1', 'namespaces': [], 'models': [ '/api/ns1/model1', '/api/ns1/model2' ], 'multi-uri-max': 100 } )
   assert sort_dsc( server.root_namespace.getElement( server.uri.split( path ) ).describe( ns1.converter ).data ) == desc_ref
   req = Request( 'DESCRIBE', path, { 'CINP-VERSION': __CINP_VERSION__ } )
   res = server.handle( req )
@@ -657,7 +657,7 @@ def test_server():
   assert res.header_map == { 'Type': 'Namespace', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '0.9' }
 
   path = '/api/ns1/model1'
-  desc_ref = sort_dsc( { 'name': 'model1', 'path': '/api/ns1/model1', 'fields': [], 'doc': '', 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] } )
+  desc_ref = sort_dsc( { 'name': 'model1', 'path': '/api/ns1/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-metods': [] } )
   assert sort_dsc( server.root_namespace.getElement( server.uri.split( path ) ).describe( ns1.converter ).data ) == desc_ref
   req = Request( 'DESCRIBE', path, { 'CINP-VERSION': __CINP_VERSION__ } )
   res = server.handle( req )

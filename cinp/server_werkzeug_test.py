@@ -118,5 +118,5 @@ def test_werkzeug_server():
         }
   wresp = server.handle( env )
   assert wresp.status_code == 200
-  assert wresp.headers == Headers( [ ( 'Cache-Control', 'max-age=0' ), ( 'Cinp-Version', '0.9' ), ( 'Content-Type', 'application/json;charset=utf-8' ), ( 'Content-Length', '131' ), ( 'Verb', 'DESCRIBE' ), ( 'Type', 'Namespace' ) ] )
-  assert json.loads( str( wresp.data, 'utf-8' ) ) == { 'multi-uri-max': 100, 'api-version': '0.0', 'path': '/api/', 'doc': '', 'namespaces': [ '/api/ns1/' ], 'models': [], 'name': 'root' }
+  assert wresp.headers == Headers( [ ( 'Cache-Control', 'max-age=0' ), ( 'Cinp-Version', '0.9' ), ( 'Content-Type', 'application/json;charset=utf-8' ), ( 'Content-Length', '120' ), ( 'Verb', 'DESCRIBE' ), ( 'Type', 'Namespace' ) ] )
+  assert json.loads( str( wresp.data, 'utf-8' ) ) == { 'multi-uri-max': 100, 'api-version': '0.0', 'path': '/api/', 'namespaces': [ '/api/ns1/' ], 'models': [], 'name': 'root' }

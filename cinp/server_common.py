@@ -4,7 +4,7 @@ import copy
 from dateutil import parser as datetimeparser
 from urllib import parse
 
-from cinp.common import URI
+from cinp.common import URI, doccstring_prep
 from cinp.readers import READER_REGISTRY
 
 __CINP_VERSION__ = '0.9'
@@ -355,7 +355,7 @@ class Paramater():
   def __init__( self, type, name=None, is_array=False, doc=None, length=None, model=None, model_resolve=None, choice_list=None, default=notset, allowed_scheme_list=None ):
     super().__init__()
     self.name = name
-    self.doc = doc
+    self.doc = doccstring_prep( doc )
     if type is None:
       self.type = None
 
@@ -391,7 +391,7 @@ class Paramater():
 
   def describe( self, converter ):
     result = { 'name': self.name, 'type': self.type }
-    if self.doc is not None:
+    if self.doc:
       result[ 'doc' ] = self.doc
 
     if self.type == 'String' and self.length is not None:
@@ -441,7 +441,7 @@ class Element():
     super().__init__()
     self.parent = None
     self.name = name
-    self.doc = doc
+    self.doc = doccstring_prep( doc )
 
   @property
   def path( self ):
@@ -539,7 +539,9 @@ class Namespace( Element ):
     self.element_map[ element.name ] = element
 
   def describe( self, converter ):
-    data = { 'name': self.name, 'path': self.path, 'api-version': self.version, 'multi-uri-max': __MULTI_URI_MAX__, 'doc': self.doc }
+    data = { 'name': self.name, 'path': self.path, 'api-version': self.version, 'multi-uri-max': __MULTI_URI_MAX__ }
+    if self.doc:
+      data[ 'doc' ] = self.doc
     namespace_list = []
     model_list = []
     for name in self.element_map:
@@ -614,7 +616,9 @@ class Model( Element ):
     self.action_map[ action.name ] = action
 
   def describe( self, converter ):
-    data = { 'name': self.name, 'path': self.path, 'doc': self.doc }
+    data = { 'name': self.name, 'path': self.path }
+    if self.doc:
+      data[ 'doc' ] = self.doc
     data[ 'constants' ] = {}
     for name in self.constant_set_map:
       data[ 'constants' ][ name ] = self.constant_set_map[ name ]
@@ -899,7 +903,9 @@ class Action( Element ):
   def describe( self, converter ):
     return_type = self.return_paramater.describe( converter )
     del return_type[ 'name' ]
-    data = { 'name': self.name, 'path': self.path, 'doc': self.doc, 'return-type': return_type, 'static': self.static }
+    data = { 'name': self.name, 'path': self.path, 'return-type': return_type, 'static': self.static }
+    if self.doc:
+      data[ 'doc' ] = self.doc
     data[ 'paramaters' ] = [ item.describe( converter ) for item in self.paramater_map.values() if item.type != '_USER_' ]
 
     return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Action', 'Cache-Control': 'max-age=0' } )
