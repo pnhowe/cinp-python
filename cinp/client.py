@@ -2,6 +2,7 @@ import os
 import socket
 import json
 import logging
+import ssl
 import http.client
 from datetime import datetime
 from tempfile import NamedTemporaryFile
@@ -9,7 +10,7 @@ from urllib import request
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '0.12.0'
+__CLIENT_VERSION__ = '0.13.0'
 __CINP_VERSION__ = '0.9'
 
 __all__ = [ 'Timeout', 'ResponseError', 'InvalidRequest', 'InvalidSession',
@@ -45,7 +46,7 @@ class ServerError( Exception ):
 
 
 class CInP():
-  def __init__( self, host, root_path, proxy=None ):
+  def __init__( self, host, root_path, proxy=None, verify_ssl=True ):
     super().__init__()
 
     if not host.startswith( ( 'http:', 'https:' ) ):
@@ -69,7 +70,10 @@ class CInP():
 
     self.opener.add_handler( request.HTTPHandler() )
     if hasattr( http.client, 'HTTPSConnection' ):
-      self.opener.add_handler( request.HTTPSHandler() )
+      if not verify_ssl:
+        self.opener.add_handler( request.HTTPSHandler( context=ssl._create_unverified_context() ) )
+      else:
+        self.opener.add_handler( request.HTTPSHandler() )
 
     self.opener.add_handler( request.UnknownHandler() )
 

@@ -1,3 +1,9 @@
+cinp (0.13.0-1) DIST; urgency=medium
+
+  * added ssl verify flag to client
+
+ -- Peter Howe <pnhowe@gmail.com>  Mon, 10 Jun 2019 09:26:21 -0600
+
 cinp (0.12.0-1) DIST; urgency=medium
 
   * Better handeling of default values
