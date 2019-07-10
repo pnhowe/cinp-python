@@ -116,6 +116,12 @@ def _fromPythonList( value ):
 
 def _fromPythonMap( value ):
   for key in value.keys():
+    if not isinstance( key, str ):
+      new_key = _fromPythonMap_converter( key )
+      value[ new_key ] = value[ key ]
+      del value[ key ]
+      key = new_key
+
     if isinstance( value[ key ], dict ):
       value[ key ] = _fromPythonMap( value[ key ] )
 
