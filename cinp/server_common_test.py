@@ -606,6 +606,100 @@ def test_response():
   assert resp.asJSON() is None  # yea, still none, base Responose dosen't asXXXX anything
 
 
+def test_saninity_checks():
+  server = Server( root_path='/api/', root_version='0.0' )
+  ns = Namespace( name='ns', version='0.1', converter=None )
+  model = Model( name='model', field_list=[], transaction_class=TestTransaction )
+  ns.addElement( model )
+  action = Action( name='action', return_paramater=Paramater( type='String' ), func=fake_func )
+  model.addAction( action )
+  server.registerNamespace( '/', ns )
+
+  res = server.dispatch( Request( 'BOB', '/api/', { 'CINP-VERSION': '0.9' } ) )
+  assert res.http_code == 400
+  assert res.data == { 'message': 'Invalid Verb (HTTP Method) "BOB"' }
+
+  res = server.dispatch( Request( 'DESCRIBE', 'invalid', { 'CINP-VERSION': '0.9' } ) )
+  assert res.http_code == 400
+  assert res.data == { 'message': 'Unable to Parse "invalid"' }
+
+  res = server.dispatch( Request( 'DESCRIBE', '/api/ns/model:' + ':'.join( 'id' * 101 ) + ':', { 'CINP-VERSION': '0.9' } ) )
+  assert res.http_code == 400
+  assert res.data == { 'message': 'id_list longer than supported length of "100"' }
+
+  res = server.dispatch( Request( 'DESCRIBE', '/api/nope', { 'CINP-VERSION': '0.9' } ) )
+  assert res.http_code == 404
+  assert res.data == { 'message': 'path not found "/api/nope"' }
+
+  res = server.handle( Request( 'DESCRIBE', '/api/', {} ) )
+  assert res.http_code == 400
+  assert res.data == { 'message': 'Invalid CInP Protocol Version' }
+
+  res = server.handle( Request( 'DESCRIBE', '/api/', { 'Cinp-Version': '0' } ) )
+  assert res.http_code == 400
+  assert res.data == { 'message': 'Invalid CInP Protocol Version' }
+
+  with pytest.raises( ValueError ):  # checkAuth not implemented, for this round of tests we call good
+    server.dispatch( Request( 'DESCRIBE', '/api/ns/model(action)', { 'CINP-VERSION': '0.9' } ) )
+
+  for verb in ( 'GET', 'LIST', 'CREATE', 'UPDATE', 'DELETE' ):
+    res = server.dispatch( Request( verb, '/api/ns/model(action)', { 'CINP-VERSION': '0.9' } ) )
+    assert res.http_code == 400
+    assert res.data == { 'message': 'Invalid verb "{0}" for request with action'.format( verb ) }
+
+  for verb in ( 'GET', 'LIST', 'CREATE', 'UPDATE', 'DELETE' ):
+    res = server.dispatch( Request( verb, '/api/ns/model:id:(action)', { 'CINP-VERSION': '0.9' } ) )
+    assert res.http_code == 400
+    assert res.data == { 'message': 'Invalid verb "{0}" for request with action'.format( verb ) }
+
+  for uri in ( '/api/', '/api/ns/', '/api/ns/model', '/api/ns/model:id:' ):
+    res = server.dispatch( Request( 'CALL', uri, { 'CINP-VERSION': '0.9' } ) )
+    assert res.http_code == 400
+    assert res.data == { 'message': 'Verb "CALL" requires action'.format( verb ) }
+
+  for verb in ( 'LIST', 'CREATE', 'DESCRIBE' ):
+    res = server.dispatch( Request( verb, '/api/ns/model:id:', { 'CINP-VERSION': '0.9' } ) )
+    assert res.http_code == 400
+    assert res.data == { 'message': 'Invalid Verb "{0}" for request with id'.format( verb ) }
+
+  for verb in ( 'GET', 'UPDATE', 'DELETE' ):
+    res = server.dispatch( Request( verb, '/api/ns/model', { 'CINP-VERSION': '0.9' } ) )
+    assert res.http_code == 400
+    assert res.data == { 'message': 'Verb "{0}" requires id'.format( verb ) }
+
+  for verb in ( 'GET', 'DELETE' ):
+    req = Request( verb, '/api/ns/model:d:', { 'CINP-VERSION': '0.9' } )
+    req.data = { 'some': 'data' }
+    res = server.dispatch( req )
+    assert res.http_code == 400
+    assert res.data == { 'message': 'Invalid verb "{0}" for request with data'.format( verb ) }
+
+  for verb in ( 'DESCRIBE', ):
+    req = Request( verb, '/api/ns/model', { 'CINP-VERSION': '0.9' } )
+    req.data = { 'some': 'data' }
+    res = server.dispatch( req )
+    assert res.http_code == 400
+    assert res.data == { 'message': 'Invalid verb "{0}" for request with data'.format( verb ) }
+
+  for verb in ( 'UPDATE', ):
+    res = server.dispatch( Request( verb, '/api/ns/model:id:', { 'CINP-VERSION': '0.9' } ) )
+    assert res.http_code == 400
+    assert res.data == { 'message': 'Verb "{0}" requires data'.format( verb ) }
+
+  for verb in ( 'CREATE', ):
+    res = server.dispatch( Request( verb, '/api/ns/model', { 'CINP-VERSION': '0.9' } ) )
+    assert res.http_code == 400
+    assert res.data == { 'message': 'Verb "{0}" requires data'.format( verb ) }
+
+  for verb in ( 'LIST', 'CREATE' ):  # also 'GET', 'UPDATE', 'DELETE' which also requires an Id which requires a model so already covered
+    req = Request( verb, '/api/ns/', { 'CINP-VERSION': '0.9' } )
+    req.data = { 'some': 'data' }
+    res = server.dispatch( req )
+    assert res.http_code == 400
+    assert res.data == { 'message': 'Verb "{0}" requires model'.format( verb ) }
+
+
+
 def test_server():
   server = Server( root_path='/api/', root_version='0.0', debug=True )
   ns1 = Namespace( name='ns1', version='0.1', converter=None )
@@ -625,18 +719,6 @@ def test_server():
   res = server.handle( req )
   assert res.http_code == 200
   assert res.header_map == { 'Allow': 'OPTIONS, DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '0.9' }
-
-  req = Request( 'DESCRIBE', '/api/', {} )
-  res = server.handle( req )
-  assert res.http_code == 400
-  assert res.header_map == { 'Cinp-Version': '0.9' }
-  assert res.data == { 'message': 'Invalid CInP Protocol Version' }
-
-  req = Request( 'DESCRIBE', '/api/', { 'Cinp-Version': '0' } )
-  res = server.handle( req )
-  assert res.http_code == 400
-  assert res.header_map == { 'Cinp-Version': '0.9' }
-  assert res.data == { 'message': 'Invalid CInP Protocol Version' }
 
   path = '/api/'
   desc_ref = sort_dsc( { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns1/', '/api/ns2/' ], 'models': [], 'multi-uri-max': 100 } )

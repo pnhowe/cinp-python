@@ -116,6 +116,12 @@ def _fromPythonList( value ):
 
 def _fromPythonMap( value ):
   for key in value.keys():
+    if not isinstance( key, str ):
+      new_key = _fromPythonMap_converter( key )
+      value[ new_key ] = value[ key ]
+      del value[ key ]
+      key = new_key
+
     if isinstance( value[ key ], dict ):
       value[ key ] = _fromPythonMap( value[ key ] )
 
@@ -1105,7 +1111,7 @@ class Server():
 
   def dispatch( self, request ):
     if request.verb not in ( 'GET', 'LIST', 'CALL', 'CREATE', 'UPDATE', 'DELETE', 'DESCRIBE', 'OPTIONS' ):
-      return Response( 400, data={ 'message': 'Invalid Verb (HTTP Method)"{0}"'.format( request.verb ) } )
+      return Response( 400, data={ 'message': 'Invalid Verb (HTTP Method) "{0}"'.format( request.verb ) } )
 
     try:
       ( path, model, action, id_list, multi ) = self.uri.split( request.uri )
@@ -1113,13 +1119,13 @@ class Server():
       return Response( 400, data={ 'message': 'Unable to Parse "{0}"'.format( request.uri ) } )
 
     if id_list is not None and len( id_list ) > __MULTI_URI_MAX__:
-      raise InvalidRequest( 'id_list longer than supported length of "{0}"'.format( __MULTI_URI_MAX__ ) )
+      return Response( 400, data={ 'message': 'id_list longer than supported length of "{0}"'.format( __MULTI_URI_MAX__ ) } )
 
     element = self.root_namespace.getElement( ( path, model, action ) )
     if element is None:
-      return Response( 404, 'path not found "{0}"'.format( request.uri ) )
+      return Response( 404, data={ 'message': 'path not found "{0}"'.format( request.uri ) } )
     if not isinstance( element, Element ):
-      return Response( 500, 'confused, path ("{0}") yeilded non element "{1}"'.format( request.uri, element ) )
+      return Response( 500, data={ 'message': 'confused, path ("{0}") yeilded non element "{1}"'.format( request.uri, element ) } )
 
     if request.verb == 'OPTIONS':  # options never need auth, nor is the Cinp-Version header required, we can take care of it early
       response = element.options()
@@ -1133,25 +1139,28 @@ class Server():
       return Response( 400, data={ 'message': 'Invalid CInP Protocol Version' } )
 
     if ( action is not None ) and ( request.verb not in ( 'CALL', 'DESCRIBE' ) ):
-      raise InvalidRequest( 'Invalid verb "{0}" for request with action'.format( request.verb ) )
+      return Response( 400, data={ 'message': 'Invalid verb "{0}" for request with action'.format( request.verb ) } )
 
     if request.verb in ( 'CALL', ) and not isinstance( element, Action ):
-      raise InvalidRequest( 'Verb "{0}" requires action'.format( request.verb ) )
+      return Response( 400, data={ 'message': 'Verb "{0}" requires action'.format( request.verb ) } )
 
     if ( id_list is not None ) and ( request.verb not in ( 'GET', 'UPDATE', 'DELETE', 'CALL' ) ):
-      raise InvalidRequest( 'Invalid Verb "{0}" for request with id'.format( request.verb ) )
+      return Response( 400, data={ 'message': 'Invalid Verb "{0}" for request with id'.format( request.verb ) } )
 
     if ( request.verb in ( 'GET', 'UPDATE', 'DELETE' ) ) and ( id_list is None ):
-      raise InvalidRequest( 'Verb "{0}" requires id'.format( request.verb ) )
+      return Response( 400, data={ 'message': 'Verb "{0}" requires id'.format( request.verb ) } )
 
     if ( request.data is not None ) and ( request.verb not in ( 'LIST', 'UPDATE', 'CREATE', 'CALL' ) ):
-      raise InvalidRequest( 'Invalid verb "{0}" for request with data'.format( request.verb ) )
+      return Response( 400, data={ 'message': 'Invalid verb "{0}" for request with data'.format( request.verb ) } )
 
-    if ( request.verb in ( 'UPDATE', 'CREATE' ) ) and ( request.data is None ):
-      raise InvalidRequest( 'Verb "{0}" requires data'.format( request.verb ) )
+    if ( request.verb in ( 'UPDATE', 'CREATE', 'LIST', 'CALL' ) ) and ( request.data is None ):
+      if request.verb in ( 'LIST', 'CALL' ):
+        request.data = {}
+      else:
+        return Response( 400, data={ 'message': 'Verb "{0}" requires data'.format( request.verb ) } )
 
     if ( request.verb in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE' ) ) and not isinstance( element, Model ):
-      raise InvalidRequest( 'Verb "{0}" requires model'.format( request.verb ) )
+      return Response( 400, data={ 'message': 'Verb "{0}" requires model'.format( request.verb ) } )
 
     if ( isinstance( element, Model ) and ( request.verb in element.not_allowed_verb_list ) ) or ( isinstance( element, Action ) and ( request.verb in element.parent.not_allowed_verb_list ) ):
       raise NotAuthorized()

@@ -7,7 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError, AppRegis
 from django.db.models import fields
 from django.core.files import File
 
-from cinp.server_common import Converter, Namespace, Model, Action, Paramater, Field, ServerError, checkAuth_true, checkAuth_false
+from cinp.server_common import Converter, Namespace, Model, Action, Paramater, Field, ServerError, checkAuth_true, checkAuth_false, MAP_TYPE_CONVERTER
 
 __MODEL_REGISTRY__ = {}
 
@@ -321,7 +321,8 @@ class DjangoCInP():
                      'default': None,
                      'mode': 'RO',
                      'type': item.get( 'type', 'String' ),
-                     'choice_list': item.get( 'choices', None )
+                     'choice_list': item.get( 'choices', None ),
+                     'is_array': item.get( 'is_array', False )
                    }
 
           paramater_model_name = item.get( 'model', None )
@@ -362,6 +363,7 @@ class DjangoCInP():
       model._django_filter_funcs_map = filter_funcs_map
       self.model_list.append( model )
       __MODEL_REGISTRY__[ '{0}.{1}'.format( cls.__module__, cls.__qualname__ ) ] = model
+      MAP_TYPE_CONVERTER[ cls.__name__ ] = lambda a: model.path + ':{0}:'.format( a.pk )
       return cls
 
     return decorator
