@@ -1,3 +1,9 @@
+cinp (0.14.0-1) DIST; urgency=medium
+
+  * Models converted in map converter
+
+ -- Peter Howe <pnhowe@gmail.com>  Wed, 10 Jul 2019 08:18:21 -0600
+
 cinp (0.13.0-1) DIST; urgency=medium
 
   * added ssl verify flag to client
