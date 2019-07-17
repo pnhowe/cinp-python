@@ -699,7 +699,6 @@ def test_saninity_checks():
     assert res.data == { 'message': 'Verb "{0}" requires model'.format( verb ) }
 
 
-
 def test_server():
   server = Server( root_path='/api/', root_version='0.0', debug=True )
   ns1 = Namespace( name='ns1', version='0.1', converter=None )
