@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for tmp
+# postinst script for python-cimp
 #
 # see: dh_installdeb(1)
 
