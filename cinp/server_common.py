@@ -1,6 +1,7 @@
 import traceback
 import json
 import copy
+import sys
 from dateutil import parser as datetimeparser
 from urllib import parse
 
@@ -85,15 +86,20 @@ def _debugDump( location, request, exception ):
   from datetime import datetime
 
   try:
-    fp = open( os.path.join( location, datetime.utcnow().isoformat() ), 'w' )
+    if location == '*CONSOLE*':
+      fp = sys.stdout
+    else:
+      fp = open( os.path.join( location, datetime.utcnow().isoformat() ), 'w' )
+
     fp.write( '** Request **\n' )
     fp.write( str( request ) )
     fp.write( '\n\n** Stack **\n' )
     traceback.print_exception( None, exception, exception.__traceback__, file=fp )
-    fp.close()
+
+    if fp is not sys.stdout:
+      fp.close()
 
   except Exception as e:
-    import sys
     sys.stderr.write( 'Error "{0}" when writing the debug dump'.format( e ) )
 
 
