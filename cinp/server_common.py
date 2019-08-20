@@ -123,7 +123,8 @@ def _fromPythonList( value ):
 def _fromPythonMap( value ):
   for key in value.keys():
     if not isinstance( key, str ):
-      new_key = _fromPythonMap_converter( key )
+      new_key = str( _fromPythonMap_converter( key ) )  # some types still convert to non-strings(int, float, etc.), JSON requires string
+      assert new_key != key  # if they are the same, bad things happen
       value[ new_key ] = value[ key ]
       del value[ key ]
       key = new_key
