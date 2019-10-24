@@ -97,7 +97,10 @@ class WerkzeugRequest( Request ):
       else:
         raise InvalidRequest( message='Unknown Content-Type "{0}"'.format( content_type ) )
 
-    self.remote_addr = werkzeug_request.remote_addr
+    if 'X-FORWARDED-FOR' in header_map:  # hm... should we really be doing this here?
+      self.remote_addr = header_map[ 'X-FORWARDED-FOR' ]
+    else:
+      self.remote_addr = werkzeug_request.remote_addr
     self.is_secure = werkzeug_request.is_secure
     werkzeug_request.close()
 
