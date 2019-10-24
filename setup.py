@@ -37,7 +37,7 @@ the Business Logic and permissions to be fully encapsulated on the Server.""",
            'Intended Audience :: Developers',
            'License :: OSI Approved :: Apache Software License',
            'Programming Language :: Python :: 3',
-           'Programming Language :: Python :: 3.4'
+           'Programming Language :: Python :: 3.6'
        ],
        packages=[ 'cinp' ],
        cmdclass={ 'build_py': build }

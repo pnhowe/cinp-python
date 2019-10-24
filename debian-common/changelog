@@ -1,3 +1,10 @@
+cinp (0.16.0-1) DIST; urgency=medium
+
+  * added RAWGET to client
+  * Fix for django file handler
+
+ -- Peter Howe <pnhowe@gmail.com>  Wed, 23 Oct 2019 23:14:23 -0600
+
 cinp (0.15.0-1) DIST; urgency=medium
 
   * map converter fix

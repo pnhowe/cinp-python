@@ -162,7 +162,7 @@ class DjangoConverter( Converter ):
       ( reader, filename ) = value
 
       if filename is None:
-        filename = ''.join( random.choice( '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-', k=20 ) )
+        filename = ''.join( random.choices( '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-', k=20 ) )
 
       if isinstance( paramater, Field ):
         return File( paramater.django_field.save( filename, reader ) )
