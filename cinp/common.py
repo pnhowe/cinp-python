@@ -58,11 +58,12 @@ class URI():
 
     result = '{0}{1}'.format( result, model )
 
-    if id_list is not None and id_list != []:
+    if id_list is not None:
       if not isinstance( id_list, list ):
         id_list = [ id_list ]
 
-      result = '{0}:{1}:'.format( result, ':'.join( id_list ) )
+      if len( id_list ) > 0:
+        result = '{0}:{1}:'.format( result, ':'.join( id_list ) )
 
     if action is not None:
       result = '{0}({1})'.format( result, action )

@@ -31,6 +31,7 @@ dist-clean: clean
 	$(RM) -fr rpmbuild
 	$(RM) -f dpkg-setup
 	$(RM) -f rpm-setup
+	$(RM) -fr dist
 
 .PHONY:: all install version clean dist-clean
 

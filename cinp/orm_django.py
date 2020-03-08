@@ -310,6 +310,12 @@ class DjangoCInP():
         else:
           raise ValueError( 'Unknown Field type "{0}"'.format( internal_type ) )
 
+        if 'is_array' not in kwargs:
+          try:
+            kwargs[ 'is_array' ] = django_field.cinp_is_array
+          except AttributeError:
+            pass
+
         field_list.append( Field( **kwargs ) )
 
       for item in property_list_:

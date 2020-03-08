@@ -1,3 +1,10 @@
+cinp (0.17.0-1) DIST; urgency=medium
+
+  * Bug fix for some empty id_lists
+  * orm_django will let fields set is_array
+
+ -- Peter Howe <pnhowe@gmail.com>  Sat, 07 Mar 2020 16:21:58 -0700
+
 cinp (0.16.0-1) DIST; urgency=medium
 
   * added RAWGET to client
