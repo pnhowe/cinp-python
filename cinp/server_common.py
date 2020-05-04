@@ -637,7 +637,7 @@ class Model( Element ):
       data[ 'constants' ][ name ] = self.constant_set_map[ name ]
     data[ 'fields' ] = [ item.describe( converter ) for item in self.field_map.values() ]
     data[ 'actions' ] = [ item.path for item in self.action_map.values() ]
-    data[ 'not-allowed-metods' ] = self.not_allowed_verb_list
+    data[ 'not-allowed-methods' ] = self.not_allowed_verb_list
     data[ 'list-filters' ] = {}
     for name in self.list_filter_map:
       data[ 'list-filters' ][ name ] = [ item.describe( converter ) for item in self.list_filter_map[ name ].values() ]
