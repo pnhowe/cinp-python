@@ -471,7 +471,7 @@ class DjangoCInP():
   def list_filter( self, name, paramater_type_list=None ):
     def decorator( func ):
       if type( func ).__name__ != 'staticmethod':
-        raise ValueError( 'check_auth func must be a staticmethod' )
+        raise ValueError( 'list_filter func must be a staticmethod' )
 
       paramater_type_list_ = paramater_type_list or []
       ( model_name, _ ) = func.__func__.__qualname__.split( '.' )
