@@ -8,9 +8,9 @@ all:
 
 install:
 ifeq (ubuntu, $(DISTRO))
-	./setup.py install --root $(DESTDIR) --install-purelib=/usr/lib/python3/dist-packages/ --prefix=/usr --no-compile -O0
+	./setup.py install --root=$(DESTDIR) --install-purelib=/usr/lib/python3/dist-packages/ --prefix=/usr --no-compile -O0
 else
-	./setup.py install --root $(DESTDIR) --prefix=/usr --no-compile -O0
+	./setup.py install --root=$(DESTDIR) --prefix=/usr --no-compile -O0
 endif
 
 version:
