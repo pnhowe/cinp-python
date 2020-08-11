@@ -60,6 +60,7 @@ def djfh( uri ):
   reader, filename = _localFileReader( uri[ len( 'djfh://' ): ] )
   return ( reader, filename )
 
+
 READER_REGISTRY[ 'djfh' ] = djfh
 
 

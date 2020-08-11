@@ -32,6 +32,7 @@ class GunicornApp( BaseApplication ):
   def load( self ):
     return self.application
 
+
 if __name__ == '__main__':
   logging.basicConfig()
   logger = logging.getLogger()

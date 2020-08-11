@@ -1,6 +1,6 @@
 import pytest
 
-from cinp.client import CInP, ResponseError, InvalidRequest, InvalidSession, NotAuthorized, NotFound, ServerError
+from cinp.client import CInP, ResponseError, InvalidRequest, DetailedInvalidRequest, InvalidSession, NotAuthorized, NotFound, ServerError
 
 # TODO: test timeout value  passthrough
 # TODO: test setting proxy, also make sure the envrionment proxy settings are handdled correctly
@@ -370,6 +370,11 @@ def test_request( mocker ):
   mocked_open.reset_mock()
   mocked_open.return_value = MockResponse( 400, {}, 'not JSON' )
   with pytest.raises( InvalidRequest ):
+    cinp._request( 'GET', '/api/v1/model:123:' )
+
+  mocked_open.reset_mock()
+  mocked_open.return_value = MockResponse( 400, {}, '{ "message": "this is a test" }' )
+  with pytest.raises( DetailedInvalidRequest ):
     cinp._request( 'GET', '/api/v1/model:123:' )
 
   mocked_open.reset_mock()
