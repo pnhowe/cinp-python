@@ -10,11 +10,12 @@ from urllib import request
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '0.17.0'
+__CLIENT_VERSION__ = '0.18.0'
 __CINP_VERSION__ = '0.9'
 
-__all__ = [ 'Timeout', 'ResponseError', 'InvalidRequest', 'InvalidSession',
-            'NotAuthorized', 'NotFound', 'ServerError', 'CInP' ]
+__all__ = [ 'Timeout', 'ResponseError', 'DetailedInvalidRequest',
+            'InvalidRequest', 'InvalidSession', 'NotAuthorized',
+            'NotFound', 'ServerError', 'CInP' ]
 
 
 class Timeout( Exception ):
@@ -27,6 +28,20 @@ class ResponseError( Exception ):
 
 class InvalidRequest( Exception ):
   pass
+
+
+class DetailedInvalidRequest( InvalidRequest ):
+  def __init__( self, data ):
+    for name in ( 'class', 'error', 'message' ):
+      setattr( self, name, None )  # this makes sure it is at least set
+      try:
+        setattr( self, name, data[ name ] )
+        del data[ name ]
+      except KeyError:
+        pass
+
+    self.data = data
+    super().__init__( self.message )
 
 
 class InvalidSession( Exception ):
@@ -208,12 +223,13 @@ class CInP():
 
     if http_code == 400:
       try:
-        message = data[ 'message' ]
+        data[ 'message' ]
+        e = DetailedInvalidRequest( data )
       except ( KeyError, ValueError, TypeError ):
-        message = buff[ 0:200 ]
+        e = InvalidRequest( buff[ 0:200 ] )
 
-      logging.warning( 'cinp: Invalid Request "{0}"'.format( message ) )
-      raise InvalidRequest( message )
+      logging.warning( 'cinp: Invalid Request "{0}"'.format( e.args[0] ) )
+      raise e
 
     if http_code == 500:
       if isinstance( data, dict ):

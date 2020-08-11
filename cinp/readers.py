@@ -23,6 +23,7 @@ def inline( uri ):
 
   return ( reader, reader.filename )
 
+
 READER_REGISTRY[ 'inline' ] = inline
 
 
@@ -30,5 +31,6 @@ def http( uri ):
   reader = request.urlopen( uri )
 
   return ( reader, os.path.basename( parse.urlparse( uri ).path ) )
+
 
 READER_REGISTRY[ 'http' ] = http
