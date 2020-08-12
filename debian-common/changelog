@@ -1,3 +1,9 @@
+cinp (0.18.0-1) DIST; urgency=medium
+
+  * Detaild InvalidRequest in client
+
+ -- Peter Howe <pnhowe@gmail.com>  Tue, 11 Aug 2020 16:21:58 -0700
+
 cinp (0.17.0-1) DIST; urgency=medium
 
   * Bug fix for some empty id_lists

@@ -32,6 +32,7 @@ dist-clean: clean
 	$(RM) -f dpkg-setup
 	$(RM) -f rpm-setup
 	$(RM) -fr dist
+	$(RM) -fr cinp.egg-info
 
 .PHONY:: all install version clean dist-clean
 
