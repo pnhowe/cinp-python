@@ -1,6 +1,7 @@
 import re
 import random
 import django
+from django.conf import settings
 from django.db import DatabaseError, models, transaction
 from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist, ValidationError, AppRegistryNotReady
@@ -37,17 +38,13 @@ def field_model_resolver( django_field ):
     except AttributeError:
       raise ValueError( 'Unknown target model "{0}" make sure it is registered, field: "{1}" model: "{2}"'.format( remote_field.through, django_field.name, django_field.model.__qualname__ ) )
 
-    if auto_created is False:
-      mode = 'RO'
-      django_model = remote_field.through
-
-    elif auto_created is None:
-      mode = 'RO'
-      django_model = remote_field.through
-
-    else:
+    if auto_created is not None:
       mode = 'RW'
       django_model = remote_field.model
+
+    else:
+      mode = 'RO'
+      django_model = remote_field.through
 
     is_array = True
 
@@ -69,7 +66,7 @@ def field_model_resolver( django_field ):
   if not isinstance( django_model, models.base.ModelBase ):
     raise ValueError( 'Remote Field model is not a model type, got "{0}"({1}), field: "{2}" model: "{3}"'.format( django_model, type( django_model ), django_field.name, django_field.model.__qualname__ ) )
 
-  target_model_name = '{0}.{1}'.format( django_model.__module__, django_model.__qualname__ )
+  target_model_name = '{0}.{1}'.format( django_model.__module__, django_model.__name__ )
   try:
     model = __MODEL_REGISTRY__[ target_model_name ]
   except KeyError:
@@ -80,7 +77,7 @@ def field_model_resolver( django_field ):
 
 def paramater_model_resolver( model_name ):
   if not isinstance( model_name, str ):
-    model_name = '{0}.{1}'.format( model_name.__module__, model_name.__qualname__ )
+    model_name = '{0}.{1}'.format( model_name.__module__, model_name.__name__ )
 
   try:
     model = __MODEL_REGISTRY__[ model_name ]
@@ -202,6 +199,11 @@ class DjangoCInP():
     self.action_map = {}
     self.check_auth_map = {}
     self.list_filter_map = {}
+
+  def _getTransactionClass( self, cls ):
+    if settings.DATABASES[ cls._meta.default_manager.db ][ 'ENGINE' ] == 'django.db.backends.sqlite3':
+      return DjangoSQLteTransaction
+    return DjangoTransaction
 
   # this is called to get the namespace to attach to the server
   def getNamespace( self, uri ):
@@ -364,11 +366,11 @@ class DjangoCInP():
       except AttributeError:
         doc = None
 
-      model = Model( name=name, doc=doc, transaction_class=DjangoTransaction, field_list=field_list, list_filter_map=filter_map, constant_set_map=constant_set_map, not_allowed_verb_list=not_allowed_verb_list )
+      model = Model( name=name, doc=doc, transaction_class=self._getTransactionClass( cls ), field_list=field_list, list_filter_map=filter_map, constant_set_map=constant_set_map, not_allowed_verb_list=not_allowed_verb_list )
       model._django_model = cls
       model._django_filter_funcs_map = filter_funcs_map
       self.model_list.append( model )
-      __MODEL_REGISTRY__[ '{0}.{1}'.format( cls.__module__, cls.__qualname__ ) ] = model
+      __MODEL_REGISTRY__[ '{0}.{1}'.format( cls.__module__, cls.__name__ ) ] = model
       MAP_TYPE_CONVERTER[ cls.__name__ ] = lambda a: model.path + ':{0}:'.format( a.pk )
       return cls
 
@@ -435,8 +437,8 @@ class DjangoCInP():
       if type( func ).__name__ != 'staticmethod':
         raise ValueError( 'check_auth func must be a staticmethod' )
 
-      ( model_name, _ ) = func.__func__.__qualname__.split( '.' )
-      self.check_auth_map[ model_name ] = func.__func__
+      model_name_parts = func.__func__.__qualname__.split( '.' )
+      self.check_auth_map[ '.'.join( model_name_parts[ :-1 ] ) ] = func.__func__
 
       return func
 
@@ -496,7 +498,7 @@ class DjangoCInP():
     return decorator
 
 
-class DjangoTransaction():
+class DjangoTransaction():  # NOTE: developed on Postgres
   def __init__( self ):
     super().__init__()
 
@@ -576,3 +578,15 @@ class DjangoTransaction():
   def abort( self ):
     transaction.rollback()
     transaction.set_autocommit( True )
+
+
+class DjangoSQLteTransaction( DjangoTransaction ):
+  # see https://docs.djangoproject.com/en/3.1/topics/db/transactions/#savepoints-in-sqlite
+  def start( self ):
+    pass
+
+  def commit( self ):
+    pass
+
+  def abort( self ):
+    pass

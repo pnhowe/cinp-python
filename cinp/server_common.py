@@ -1236,7 +1236,11 @@ class Server():
 
     except Exception as e:
       if in_transaction:
-        transaction.abort()
+        try:
+          transaction.abort()
+        except Exception:  # TODO: put some logging in here, this should be a warning log
+          pass
+
       raise e
 
     if result is None:

@@ -18,3 +18,4 @@ htmlcov
 .coverage
 .coveragerc
 .cache
+cinp/django_settings.py
