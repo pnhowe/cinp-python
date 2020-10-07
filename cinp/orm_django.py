@@ -378,11 +378,15 @@ class DjangoCInP():
 
   def staticModel( self, not_allowed_verb_list=None, cache_length=3600 ):
     def decorator( cls ):
-
       name = cls.__qualname__
       not_allowed_verb_list_ = list( set( [ 'LIST', 'GET', 'CREATE', 'UPDATE', 'DELETE' ] ).union( set( not_allowed_verb_list or [] ) ) )
 
-      model = Model( name=name, transaction_class=DjangoTransaction, field_list=[], list_filter_map={}, constant_set_map={}, not_allowed_verb_list=not_allowed_verb_list_ )
+      try:
+        doc = cls.__doc__.strip()
+      except AttributeError:
+        doc = None
+
+      model = Model( name=name, doc=doc, transaction_class=DjangoTransaction, field_list=[], list_filter_map={}, constant_set_map={}, not_allowed_verb_list=not_allowed_verb_list_ )
       self.model_list.append( model )
       return cls
 
@@ -548,14 +552,19 @@ class DjangoTransaction():  # NOTE: developed on Postgres
 
   def list( self, model, filter_name, filter_values, position, count ):
     if filter_name is None:
-      qs = model._django_model.objects.all().values_list( 'pk' )
+      qs = model._django_model.objects.all()
     else:
       try:
         filter_func = model._django_filter_funcs_map[ filter_name ]
       except KeyError:
         raise ServerError( 'filter_func for "{0}" not found'.format( filter_name ) )  # the filter_name should of allready been checked, something is seriously wrong
 
-      qs = filter_func( **filter_values ).values_list( 'pk' )
+      qs = filter_func( **filter_values )
+
+    if not qs.orderd:
+      qs = qs.order_by( 'pk' )
+
+    qs = qs.values_list( 'pk' )
 
     return ( [ item[0] for item in qs[ position:position + count ] ], position, qs.count() )
 
