@@ -1,8 +1,6 @@
 import pytest
 
-from django.conf import settings
 from django.db import models
-from django.core.management import call_command
 
 from cinp.orm_django import DjangoCInP
 from cinp.server_common import Server, Request
@@ -80,6 +78,21 @@ def test_simple_model():
     """
     name = models.CharField( max_length=20 )
     description = models.CharField( max_length=100, help_text='bob stuff' )
+    string3 = models.CharField( default='stuff', max_length=20 )
+    string4 = models.CharField( choices=( ( 'one', 'The One' ), ( 'two', 'The Other' ) ), max_length=20 )
+    string5 = models.CharField( choices=( ( 'one', 'The One' ), ( 'two', 'The Other' ) ), default='two', max_length=20 )
+    boolean1 = models.BooleanField()
+    boolean2 = models.BooleanField( default=True )
+    boolean3 = models.BooleanField( blank=True )
+    boolean4 = models.BooleanField( blank=True, default=False )
+    integer1 = models.IntegerField()
+    integer2 = models.IntegerField( default=5 )
+    integer3 = models.IntegerField( blank=True )
+    integer4 = models.IntegerField( blank=True, default=23 )
+    datetime1 = models.DateTimeField()
+    datetime2 = models.DateTimeField( blank=True )
+    datetime3 = models.DateTimeField( auto_now=True )
+    datetime4 = models.DateTimeField( auto_now_add=True )
 
     @cinp.check_auth()
     @staticmethod
@@ -95,7 +108,22 @@ def test_simple_model():
                         'test_simple_model.<locals>.Simon':
                         ( 'test_simple_model.<locals>.Simon', 'Simple Simon', {}, {}, [], [
                           ( 'name', '', 'String', 'RW', True, False, None, None ),
-                          ( 'description', 'bob stuff', 'String', 'RW', True, False, None, None )
+                          ( 'description', 'bob stuff', 'String', 'RW', True, False, None, None ),
+                          ( 'string3', '', 'String', 'RW', False, False, None, 'stuff' ),
+                          ( 'string4', '', 'String', 'RW', True, False, ['one', 'two'], None ),
+                          ( 'string5', '', 'String', 'RW', False, False, ['one', 'two'], 'two' ),
+                          ( 'boolean1', '', 'Boolean', 'RW', True, False, None, None ),
+                          ( 'boolean2', '', 'Boolean', 'RW', False, False, None, True ),
+                          ( 'boolean3', '', 'Boolean', 'RW', False, False, None, None ),
+                          ( 'boolean4', '', 'Boolean', 'RW', False, False, None, False ),
+                          ( 'integer1', '', 'Integer', 'RW', True, False, None, None ),
+                          ( 'integer2', '', 'Integer', 'RW', False, False, None, 5 ),
+                          ( 'integer3', '', 'Integer', 'RW', False, False, None, None ),
+                          ( 'integer4', '', 'Integer', 'RW', False, False, None, 23 ),
+                          ( 'datetime1', '', 'DateTime', 'RW', True, False, None, None ),
+                          ( 'datetime2', '', 'DateTime', 'RW', False, False, None, None ),
+                          ( 'datetime3', '', 'DateTime', 'RO', False, False, None, None ),
+                          ( 'datetime4', '', 'DateTime', 'RO', False, False, None, None ),
                           ] ) } )
 
   r = srv.dispatch( Request( uri='/', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
@@ -123,10 +151,90 @@ def test_simple_model():
                                   'mode': 'RW',
                                   'name': 'description',
                                   'required': True,
-                                  'type': 'String'}],
+                                  'type': 'String'},
+                                 {'default': 'stuff',
+                                  'length': 20,
+                                  'mode': 'RW',
+                                  'name': 'string3',
+                                  'required': False,
+                                  'type': 'String'},
+                                 {'default': None,
+                                  'length': 20,
+                                  'mode': 'RW',
+                                  'name': 'string4',
+                                  'required': True,
+                                  'type': 'String',
+                                  'choices': ['one', 'two']},
+                                 {'default': 'two',
+                                  'length': 20,
+                                  'mode': 'RW',
+                                  'name': 'string5',
+                                  'required': False,
+                                  'type': 'String',
+                                  'choices': ['one', 'two']},
+                                 {'default': None,
+                                  'mode': 'RW',
+                                  'name': 'boolean1',
+                                  'required': True,
+                                  'type': 'Boolean'},
+                                 {'default': True,
+                                  'mode': 'RW',
+                                  'name': 'boolean2',
+                                  'required': False,
+                                  'type': 'Boolean'},
+                                 {'default': None,
+                                  'mode': 'RW',
+                                  'name': 'boolean3',
+                                  'required': False,
+                                  'type': 'Boolean'},
+                                 {'default': False,
+                                  'mode': 'RW',
+                                  'name': 'boolean4',
+                                  'required': False,
+                                  'type': 'Boolean'},
+                                 {'default': None,
+                                  'mode': 'RW',
+                                  'name': 'integer1',
+                                  'required': True,
+                                  'type': 'Integer'},
+                                 {'default': 5,
+                                  'mode': 'RW',
+                                  'name': 'integer2',
+                                  'required': False,
+                                  'type': 'Integer'},
+                                 {'default': None,
+                                  'mode': 'RW',
+                                  'name': 'integer3',
+                                  'required': False,
+                                  'type': 'Integer'},
+                                 {'default': 23,
+                                  'mode': 'RW',
+                                  'name': 'integer4',
+                                  'required': False,
+                                  'type': 'Integer'},
+                                 {'default': None,
+                                  'mode': 'RW',
+                                  'name': 'datetime1',
+                                  'required': True,
+                                  'type': 'DateTime'},
+                                 {'default': None,
+                                  'mode': 'RW',
+                                  'name': 'datetime2',
+                                  'required': False,
+                                  'type': 'DateTime'},
+                                 {'default': None,
+                                  'mode': 'RO',
+                                  'name': 'datetime3',
+                                  'required': False,
+                                  'type': 'DateTime'},
+                                 {'default': None,
+                                  'mode': 'RO',
+                                  'name': 'datetime4',
+                                  'required': False,
+                                  'type': 'DateTime'}],
                       'list-filters': {},
                       'name': 'test_simple_model.<locals>.Simon',
-                      'not-allowed-methods': [],
+                      'not-allowed-verbs': [],
                       'path': '/Simple/test_simple_model.<locals>.Simon'
                     }
   assert r.http_code == 200
@@ -159,9 +267,9 @@ def test_multi_model():
 
   @cinp.model()
   class Detail( models.Model ):
-    header = models.ForeignKey( Header )
+    header = models.ForeignKey( Header, on_delete=models.PROTECT )
     type = models.IntegerField( choices=( ( 1, 1 ), ( 2, 3 ) ) )
-    viewable = models.BooleanField()
+    viewable = models.BooleanField( default=True )
 
     @cinp.check_auth()
     @staticmethod
@@ -176,7 +284,7 @@ def test_multi_model():
   _ns_compare( srv.getTestNS( 'Simple' ), ( 'Simple', '0.1', '' ), {
                         'test_multi_model.<locals>.Header':
                         ( 'test_multi_model.<locals>.Header', 'Header(name, updated, created)', {}, {}, [], [
-                          ( 'name', '', 'String', 'RC', True, False, None, 'bob' ),
+                          ( 'name', '', 'String', 'RC', False, False, None, 'bob' ),
                           ( 'updated', '', 'DateTime', 'RO', False, False, None, None ),
                           ( 'created', '', 'DateTime', 'RO', False, False, None, None )
                           ] ),
@@ -184,7 +292,7 @@ def test_multi_model():
                         ( 'test_multi_model.<locals>.Detail', 'Detail(id, header, type, viewable)', {}, {}, [], [
                           ( 'header', '', 'Model', 'RW', True, False, None, None, 'test_multi_model.<locals>.Header' ),
                           ( 'type', '', 'Integer', 'RW', True, False, [1, 2], None ),
-                          ( 'viewable', '', 'Boolean', 'RW', False, False, None, None )
+                          ( 'viewable', '', 'Boolean', 'RW', False, False, None, True )
                           ] ) } )
 
   r = srv.dispatch( Request( uri='/', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
@@ -204,7 +312,7 @@ def test_multi_model():
                                   'length': 20,
                                   'mode': 'RC',
                                   'name': 'name',
-                                  'required': True,
+                                  'required': False,
                                   'type': 'String'},
                                  {'default': None,
                                   'mode': 'RO',
@@ -218,7 +326,7 @@ def test_multi_model():
                                   'type': 'DateTime'}],
                       'list-filters': {},
                       'name': 'test_multi_model.<locals>.Header',
-                      'not-allowed-methods': [],
+                      'not-allowed-verbs': [],
                       'path': '/Simple/test_multi_model.<locals>.Header'
                     }
   assert r.http_code == 200
@@ -240,14 +348,14 @@ def test_multi_model():
                                   'name': 'type',
                                   'required': True,
                                   'type': 'Integer'},
-                                 {'default': None,
+                                 {'default': True,
                                   'mode': 'RW',
                                   'name': 'viewable',
                                   'required': False,
                                   'type': 'Boolean'}],
                       'list-filters': {},
                       'name': 'test_multi_model.<locals>.Detail',
-                      'not-allowed-methods': [],
+                      'not-allowed-verbs': [],
                       'path': '/Simple/test_multi_model.<locals>.Detail'
                     }
   assert r.http_code == 200
@@ -290,7 +398,7 @@ def test_multi_model_manytomany():
   _ns_compare( srv.getTestNS( 'Simple' ), ( 'Simple', '0.1', '' ), {
                         'test_multi_model_manytomany.<locals>.Header':
                         ( 'test_multi_model_manytomany.<locals>.Header', 'Header(name, updated, created)', {}, {}, [], [
-                          ( 'name', '', 'String', 'RC', True, False, None, 'bob' ),
+                          ( 'name', '', 'String', 'RC', False, False, None, 'bob' ),
                           ( 'updated', '', 'DateTime', 'RO', False, False, None, None ),
                           ( 'created', '', 'DateTime', 'RO', False, False, None, None )
                           ] ),
@@ -298,7 +406,7 @@ def test_multi_model_manytomany():
                         ( 'test_multi_model_manytomany.<locals>.Detail', 'Detail(id, type, viewable)', {}, {}, [], [
                           ( 'header', '', 'Model', 'RW', True, True, None, None, 'test_multi_model_manytomany.<locals>.Header' ),
                           ( 'type', '', 'Integer', 'RW', True, False, [1, 2], None ),
-                          ( 'viewable', '', 'Boolean', 'RW', False, False, None, None )
+                          ( 'viewable', '', 'Boolean', 'RW', True, False, None, None )
                           ] ) } )
 
   r = srv.dispatch( Request( uri='/', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
@@ -318,7 +426,7 @@ def test_multi_model_manytomany():
                                   'length': 20,
                                   'mode': 'RC',
                                   'name': 'name',
-                                  'required': True,
+                                  'required': False,
                                   'type': 'String'},
                                  {'default': None,
                                   'mode': 'RO',
@@ -332,7 +440,7 @@ def test_multi_model_manytomany():
                                   'type': 'DateTime'}],
                       'list-filters': {},
                       'name': 'test_multi_model_manytomany.<locals>.Header',
-                      'not-allowed-methods': [],
+                      'not-allowed-verbs': [],
                       'path': '/Simple/test_multi_model_manytomany.<locals>.Header'
                     }
   assert r.http_code == 200
@@ -351,7 +459,7 @@ def test_multi_model_manytomany():
                                  {'default': None,
                                   'mode': 'RW',
                                   'name': 'viewable',
-                                  'required': False,
+                                  'required': True,
                                   'type': 'Boolean'},
                                  {'default': [],
                                   'is_array': True,
@@ -362,7 +470,7 @@ def test_multi_model_manytomany():
                                   'uri': '/Simple/test_multi_model_manytomany.<locals>.Header'}],
                       'list-filters': {},
                       'name': 'test_multi_model_manytomany.<locals>.Detail',
-                      'not-allowed-methods': [],
+                      'not-allowed-verbs': [],
                       'path': '/Simple/test_multi_model_manytomany.<locals>.Detail'
                     }
   assert r.http_code == 200
@@ -399,8 +507,8 @@ def test_multi_through_model_manytomany():
 
   @cinp.model()
   class HeaderDetail( models.Model ):
-    header = models.ForeignKey( Header )
-    detail = models.ForeignKey( Detail )
+    header = models.ForeignKey( Header, on_delete=models.PROTECT )
+    detail = models.ForeignKey( Detail, on_delete=models.PROTECT )
     extra = models.CharField( blank=True, null=True )
 
     @cinp.check_auth()
@@ -451,7 +559,7 @@ def test_multi_through_model_manytomany():
                                   'type': 'String'}],
                       'list-filters': {},
                       'name': 'test_multi_through_model_manytomany.<locals>.Header',
-                      'not-allowed-methods': [],
+                      'not-allowed-verbs': [],
                       'path': '/Simple/test_multi_through_model_manytomany.<locals>.Header'
                     }
   assert r.http_code == 200
@@ -476,7 +584,7 @@ def test_multi_through_model_manytomany():
                                   'uri': '/Simple/test_multi_through_model_manytomany.<locals>.Header'}],
                       'list-filters': {},
                       'name': 'test_multi_through_model_manytomany.<locals>.Detail',
-                      'not-allowed-methods': [],
+                      'not-allowed-verbs': [],
                       'path': '/Simple/test_multi_through_model_manytomany.<locals>.Detail'
                     }
   assert r.http_code == 200

@@ -59,7 +59,7 @@ dpkg-blueprints:
 	echo ubuntu-xenial-base ubuntu-bionic-base ubuntu-focal-base
 
 dpkg-requires:
-	echo dpkg-dev debhelper python3-dev python3-setuptools
+	echo dpkg-dev debhelper python3-dev python3-setuptools dh-python
 
 dpkg-setup:
 	./debian-setup
