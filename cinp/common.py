@@ -9,7 +9,7 @@ class URI():
       raise ValueError( 'root_path must start and end with "/"' )
 
     self.root_path = root_path
-    self.uri_regex = re.compile( '^({0}|/)(([a-zA-Z0-9\-_.!~*<>]+/)*)([a-zA-Z0-9\-_.!~*<>]+)?(:([a-zA-Z0-9\-_.!~*\'<>]*:)*)?(\([a-zA-Z0-9\-_.!~*<>]+\))?$'.format( self.root_path ) )
+    self.uri_regex = re.compile( r'^({0}|/)(([a-zA-Z0-9\-_.!~*<>]+/)*)([a-zA-Z0-9\-_.!~*<>]+)?(:([a-zA-Z0-9\-_.!~*\'<>]*:)*)?(\([a-zA-Z0-9\-_.!~*<>]+\))?$'.format( self.root_path ) )
 
   def split( self, uri, root_optional=False ):
     uri_match = self.uri_regex.match( uri )
@@ -58,12 +58,11 @@ class URI():
 
     result = '{0}{1}'.format( result, model )
 
-    if id_list is not None:
+    if id_list is not None and id_list != []:
       if not isinstance( id_list, list ):
         id_list = [ id_list ]
 
-      if len( id_list ) > 0:
-        result = '{0}:{1}:'.format( result, ':'.join( id_list ) )
+      result = '{0}:{1}:'.format( result, ':'.join( id_list ) )
 
     if action is not None:
       result = '{0}({1})'.format( result, action )

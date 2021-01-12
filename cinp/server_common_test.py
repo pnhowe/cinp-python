@@ -655,7 +655,7 @@ def test_saninity_checks():
   for uri in ( '/api/', '/api/ns/', '/api/ns/model', '/api/ns/model:id:' ):
     res = server.dispatch( Request( 'CALL', uri, { 'CINP-VERSION': '0.9' } ) )
     assert res.http_code == 400
-    assert res.data == { 'message': 'Verb "CALL" requires action'.format( verb ) }
+    assert res.data == { 'message': 'Verb "CALL" requires action' }
 
   for verb in ( 'LIST', 'CREATE', 'DESCRIBE' ):
     res = server.dispatch( Request( verb, '/api/ns/model:id:', { 'CINP-VERSION': '0.9' } ) )
