@@ -32,28 +32,34 @@ dist-clean: clean
 	$(RM) -f dpkg-setup
 	$(RM) -f rpm-setup
 	$(RM) -fr dist
+	$(RM) -fr cinp.egg-info
 
 .PHONY:: all install version clean dist-clean
 
-test-distros:
-	echo ubuntu-xenial
+test-blueprints:
+	echo ubuntu-xenial-base
 
 test-requires:
 	echo flake8 python3-cinp python3-pytest python3-pytest-cov python3-pytest-mock python3-werkzeug
 
+test-setup:
+	pip3 install -e .
+	ln -s ../django_test.settings cinp/django_settings.py
+	touch test-setup
+
 lint:
-	flake8 --ignore=E501,E201,E202,E111,E126,E114,E402,W605 --statistics --exclude=migrations .
+	flake8 --ignore=E501,E201,E202,E111,E126,E114,E402 --statistics --exclude=migrations .
 
 test:
-	py.test-3 -x --cov=cinp --cov-report html --cov-report term -vv cinp
+	py.test-3 -x --cov=cinp --cov-report html --cov-report term --ds=cinp.django_settings -vv cinp
 
-.PHONY:: test-distroy lint-requires lint test-requires test
+.PHONY:: test-blueprints lint-requires lint test-requires test
 
-dpkg-distros:
-	echo ubuntu-trusty ubuntu-xenial ubuntu-bionic
+dpkg-blueprints:
+	echo ubuntu-xenial-base ubuntu-bionic-base ubuntu-focal-base
 
 dpkg-requires:
-	echo dpkg-dev debhelper python3-dev python3-setuptools
+	echo dpkg-dev debhelper python3-dev python3-setuptools dh-python
 
 dpkg-setup:
 	./debian-setup
@@ -66,10 +72,10 @@ dpkg:
 dpkg-file:
 	echo $(shell ls ../python3-cinp_*.deb)
 
-.PHONY:: dpkg-distros dpkg-requires dpkg-setup dpkg-file
+.PHONY:: dpkg-blueprints dpkg-requires dpkg-setup dpkg-file
 
-rpm-distros:
-	echo centos-6 centos-7
+rpm-blueprints:
+	echo centos-6-base centos-7-base
 
 rpm-requires:
 	echo rpm-build
@@ -90,7 +96,7 @@ rpm:
 rpm-file:
 	echo $(shell ls rpmbuild/RPMS/*/python3-cinp-*.rpm)
 
-.PHONY:: rpm-distros rpm-requires rpm-setup rpm-file
+.PHONY:: rpm-blueprints rpm-requires rpm-setup rpm-file
 
 demo:
 	cd server_test && rm -f db.sqlite3 && ./manage.py migrate --noinput

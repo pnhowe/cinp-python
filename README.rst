@@ -1,6 +1,11 @@
 CInP Python Implementation
 ==========================
 
+Requirements
+------------
+
+Minimum version of django is 1.8 when using the django_orm
+
 
 Instalation
 -----------
@@ -15,7 +20,7 @@ debian pacaging files are also included, to build the cinp package::
   dpkg-buildpackage
 
 this should create a .deb file in the parent directory.
-  
+
 
 
 File Paramaters/Fields

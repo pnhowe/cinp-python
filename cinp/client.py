@@ -137,7 +137,7 @@ class CInP():
     if verb in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL' ) and not model:
       raise InvalidRequest( 'Verb "{0}" requires model'.format( verb ) )
 
-  def _request( self, verb, uri, data=None, header_map=None, timeout=30 ):
+  def _request( self, verb, uri, data=None, header_map=None, timeout=30 ):  # TODO: implement retry
     logging.debug( 'cinp: making "{0}" request to "{1}"'.format( verb, uri ) )
     if header_map is None:
       header_map = {}
