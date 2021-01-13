@@ -248,14 +248,14 @@ def test_model():
   field_list.append( Field( name='field1', type='String', length=50 ) )
   field_list.append( Field( name='field2', type='Integer', mode='RO' ) )
 
-  model2 = Model( name='model2', transaction_class=TestTransaction, field_list=field_list )
+  model2 = Model( name='model2', transaction_class=TestTransaction, field_list=field_list, id_field_name='field2' )
   assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1' ], 'multi-uri-max': 100 }
   assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [] }
-  assert sort_dsc( model2.describe( ns.converter ).data ) == { 'name': 'model2', 'path': None, 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True, }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [] }
+  assert sort_dsc( model2.describe( ns.converter ).data ) == { 'name': 'model2', 'path': None, 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True, }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'actions': [], 'constants': {}, 'id-field-name': 'field2', 'list-filters': {}, 'not-allowed-verbs': [] }
   ns.addElement( model2 )
   assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1', '/api/model2' ], 'multi-uri-max': 100 }
   assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [] }
-  assert sort_dsc( model2.describe( model2.parent.converter ).data ) == { 'name': 'model2', 'path': '/api/model2', 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [] }
+  assert sort_dsc( model2.describe( model2.parent.converter ).data ) == { 'name': 'model2', 'path': '/api/model2', 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'actions': [], 'constants': {}, 'id-field-name': 'field2', 'list-filters': {}, 'not-allowed-verbs': [] }
 
   assert model2.describe( model2.parent.converter ).header_map == { 'Cache-Control': 'max-age=0', 'Verb': 'DESCRIBE', 'Type': 'Model' }
 
