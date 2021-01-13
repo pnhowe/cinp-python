@@ -233,6 +233,8 @@ class DjangoCInP():
       if hide_field_list_ and show_field_list_:
         raise ValueError( 'hide_field_list and show_field_list are Mutually Exclusive' )
 
+      pk_field_name = None
+      django_field_list = []
       for django_field in meta.fields + meta.many_to_many:
         if django_field.auto_created:
           continue
@@ -243,15 +245,30 @@ class DjangoCInP():
         if show_field_list_ and django_field.name not in show_field_list_:
           continue
 
+        django_field_list.append( django_field )
+
+        if django_field.primary_key:
+          pk_field_name = django_field.name
+
+      if pk_field_name is None:
+        django_field = meta.pk
+        if django_field.get_internal_type() == 'OneToOneField':
+          django_field = django_field.remote_field.get_related_field()
+
+        django_field_list.append( django_field )
+        pk_field_name = django_field.name
+
+      for django_field in django_field_list:
         kwargs = {
                    'name': django_field.name,
                    'doc': str( django_field.help_text ) if django_field.help_text else None,
-                   'required': not django_field.blank and django_field.default == fields.NOT_PROVIDED,
+                   'required': not django_field.blank and not django_field.auto_created and django_field.default == fields.NOT_PROVIDED,
                    'choice_list': [ item[0] for item in django_field.choices ] if django_field.choices else None,
                    'default': django_field.default if django_field.default != fields.NOT_PROVIDED else None
                  }
 
-        if django_field.editable and django_field.name not in read_only_list_:
+
+        if django_field.editable and not django_field.auto_created and django_field.name not in read_only_list_:
           kwargs[ 'mode' ] = 'RC' if django_field.primary_key else 'RW'
         else:
           kwargs[ 'mode' ] = 'RO'
@@ -267,7 +284,7 @@ class DjangoCInP():
           kwargs[ 'type' ] = 'String'
           kwargs[ 'length' ] = django_field.max_length
 
-        elif internal_type in ( 'DecimalField', 'IntegerField', 'SmallIntegerField', 'PositiveIntegerField', 'PositiveSmallIntegerField', 'AutField' ) or cinp_type == 'Integer':
+        elif internal_type in ( 'DecimalField', 'IntegerField', 'SmallIntegerField', 'PositiveIntegerField', 'PositiveSmallIntegerField', 'AutoField' ) or cinp_type == 'Integer':
           kwargs[ 'type' ] = 'Integer'
 
         elif internal_type in ( 'FloatField', ) or cinp_type == 'Float':
@@ -362,7 +379,7 @@ class DjangoCInP():
       except AttributeError:
         doc = None
 
-      model = Model( name=name, doc=doc, transaction_class=self._getTransactionClass( cls ), field_list=field_list, list_filter_map=filter_map, constant_set_map=constant_set_map, not_allowed_verb_list=not_allowed_verb_list )
+      model = Model( name=name, doc=doc, id_field_name=pk_field_name, transaction_class=self._getTransactionClass( cls ), field_list=field_list, list_filter_map=filter_map, constant_set_map=constant_set_map, not_allowed_verb_list=not_allowed_verb_list )
       model._django_model = cls
       model._django_filter_funcs_map = filter_funcs_map
       self.model_list.append( model )

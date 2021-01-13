@@ -579,9 +579,10 @@ class Namespace( Element ):
 
 
 class Model( Element ):
-  def __init__( self, field_list, transaction_class, list_filter_map=None, constant_set_map=None, not_allowed_verb_list=None, *args, **kwargs ):
+  def __init__( self, field_list, transaction_class, id_field_name=None, list_filter_map=None, constant_set_map=None, not_allowed_verb_list=None, *args, **kwargs ):
     super().__init__( *args, **kwargs )
     self.transaction_class = transaction_class
+    self.id_field_name = id_field_name
     self.field_map = {}
     for field in field_list:
       if not isinstance( field, Field ):
@@ -636,6 +637,8 @@ class Model( Element ):
     for name in self.constant_set_map:
       data[ 'constants' ][ name ] = self.constant_set_map[ name ]
     data[ 'fields' ] = [ item.describe( converter ) for item in self.field_map.values() ]
+    if self.id_field_name:
+      data[ 'id-field-name' ] = self.id_field_name
     data[ 'actions' ] = [ item.path for item in self.action_map.values() ]
     data[ 'not-allowed-verbs' ] = self.not_allowed_verb_list
     data[ 'list-filters' ] = {}
