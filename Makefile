@@ -22,6 +22,7 @@ clean:
 	$(RM) -f dpkg
 	$(RM) -f rpm
 	$(RM) -fr htmlcov
+	$(RM) cinp/django_settings.py
 ifeq (ubuntu, $(DISTRO))
 	dh_clean || true
 endif
