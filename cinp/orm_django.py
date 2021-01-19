@@ -267,7 +267,6 @@ class DjangoCInP():
                    'default': django_field.default if django_field.default != fields.NOT_PROVIDED else None
                  }
 
-
         if django_field.editable and not django_field.auto_created and django_field.name not in read_only_list_:
           kwargs[ 'mode' ] = 'RC' if django_field.primary_key else 'RW'
         else:
