@@ -423,7 +423,7 @@ class Paramater():
         result[ 'is_array' ] = True
       if self.default is not notset:
         if callable( self.default ):
-          result[ 'default' ] = '<callable "{0}">'.format( self.default.__name__ )
+          result[ 'default' ] = converter.fromPython( self, self.default() )
         else:
           result[ 'default' ] = converter.fromPython( self, self.default )
 
