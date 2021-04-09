@@ -4,6 +4,7 @@ import copy
 import sys
 from dateutil import parser as datetimeparser
 from urllib import parse
+from django.db.models import QuerySet
 
 from cinp.common import URI, doccstring_prep
 from cinp.readers import READER_REGISTRY
@@ -350,7 +351,8 @@ class Converter():
 
       result = []
       if paramater.type == 'Model':
-        python_value = list( python_value.all() )  # django specific again, and really should only get the pk
+        if isinstance( python_value, QuerySet ):
+          python_value = list( python_value.all() )  # django specific again, and really should only get the pk
 
       if not isinstance( python_value, list ):
         raise ValueError( 'Must be an Array/List, got "{0}"'.format( type( python_value ).__name__ ) )
