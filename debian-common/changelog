@@ -1,3 +1,9 @@
+cinp (0.20.0-1) DIST; urgency=medium
+
+  * djamgo orm fixes
+
+ -- Peter Howe <pnhowe@gmail.com>  Fri, 09 Apr 2021 10:18:56 -0600
+
 cinp (0.19.0-1) DIST; urgency=medium
 
   * Updates for Django 2.x
