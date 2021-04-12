@@ -12,6 +12,7 @@ dpkg
 dpkg-setup
 rpm
 rpm-setup
+test-setup
 
 # test/lint output/temp stuff
 htmlcov

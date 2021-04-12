@@ -49,7 +49,7 @@ test-setup:
 	touch test-setup
 
 lint:
-	flake8 --ignore=E501,E201,E202,E111,E126,E114,E402,W503 --statistics --exclude=migrations,build .
+	flake8 --ignore=E501,E201,E202,E111,E126,E114,E402,W503 --statistics --exclude=migrations,build . bin/djfhCleaner
 
 test:
 	py.test-3 -x --cov=cinp --cov-report html --cov-report term --ds=cinp.django_settings -vv cinp
