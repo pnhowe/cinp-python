@@ -1,3 +1,9 @@
+cinp (0.21.1-1) DIST; urgency=medium
+
+  * python client describe returns type
+
+ -- Peter Howe <pnhowe@gmail.com>  Wed, 16 Jun 2021 15:16:31 -0600
+
 cinp (0.20.1-1) DIST; urgency=medium
 
   * django orm fixes
