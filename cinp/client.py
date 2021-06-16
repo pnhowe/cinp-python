@@ -268,13 +268,13 @@ class CInP():
     DESCRIE
     """
     logging.debug( 'cinp: DESCRIBE "{0}"'.format( uri ) )
-    ( http_code, data, _ ) = self._request( 'DESCRIBE', uri, timeout=timeout )
+    ( http_code, data, header_map ) = self._request( 'DESCRIBE', uri, timeout=timeout )
 
     if http_code != 200:
       logging.warning( 'cinp: Unexpected HTTP Code "{0}" for DESCRIBE'.format( http_code ) )
       raise ResponseError( 'Unexpected HTTP Code "{0}" for DESCRIBE'.format( http_code ) )
 
-    return data
+    return data, header_map[ 'Type' ]
 
   def list( self, uri, filter_name=None, filter_value_map=None, position=0, count=10, timeout=30 ):
     """
