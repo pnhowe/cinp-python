@@ -835,15 +835,18 @@ def test_call( mocker ):
 
 
 def test_describe( mocker ):
+  header_map = {}
   cinp = CInP( 'http://localhost:8080', '/api/v1/', None )
   mocked_open = mocker.patch( 'urllib.request.OpenerDirector.open' )
-  mocked_open.return_value = MockResponse( 200, {}, '' )
+  mocked_open.return_value = MockResponse( 200, header_map, '' )
 
   with pytest.raises( InvalidRequest ):
     cinp.describe( '/api/v1/model:sdf:' )
 
+  header_map[ 'Type' ] = 'Namespace'
   mocked_open.reset_mock()
-  data = cinp.describe( '/api/v1/' )
+  data, type = cinp.describe( '/api/v1/' )
+  assert type == 'Namespace'
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/'
   assert req.data == b''
@@ -851,8 +854,10 @@ def test_describe( mocker ):
   assert req.get_method() == 'DESCRIBE'
   assert data is None
 
+  header_map[ 'Type' ] = 'Model'
   mocked_open.reset_mock()
-  data = cinp.describe( '/api/v1/model' )
+  data, type = cinp.describe( '/api/v1/model' )
+  assert type == 'Model'
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model'
   assert req.data == b''
@@ -860,8 +865,10 @@ def test_describe( mocker ):
   assert req.get_method() == 'DESCRIBE'
   assert data is None
 
+  header_map[ 'Type' ] = 'Action'
   mocked_open.reset_mock()
-  data = cinp.describe( '/api/v1/model(sdf)' )
+  data, type = cinp.describe( '/api/v1/model(sdf)' )
+  assert type == 'Action'
   req = mocked_open.call_args[0][0]
   assert req.full_url == 'http://localhost:8080/api/v1/model(sdf)'
   assert req.data == b''
