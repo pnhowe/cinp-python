@@ -22,6 +22,7 @@ clean:
 	$(RM) -f dpkg
 	$(RM) -f rpm
 	$(RM) -fr htmlcov
+	$(RM) cinp/django_settings.py
 ifeq (ubuntu, $(DISTRO))
 	dh_clean || true
 endif
@@ -37,10 +38,10 @@ dist-clean: clean
 .PHONY:: all install version clean dist-clean
 
 test-blueprints:
-	echo ubuntu-xenial-base
+	echo ubuntu-focal-base
 
 test-requires:
-	echo flake8 python3-cinp python3-pytest python3-pytest-cov python3-pytest-mock python3-werkzeug
+	echo flake8 python3-cinp python3-pytest python3-pytest-cov python3-pytest-mock python3-werkzeug python3-pip python3-django python3-pytest-django
 
 test-setup:
 	pip3 install -e .
@@ -48,7 +49,7 @@ test-setup:
 	touch test-setup
 
 lint:
-	flake8 --ignore=E501,E201,E202,E111,E126,E114,E402 --statistics --exclude=migrations .
+	flake8 --ignore=E501,E201,E202,E111,E126,E114,E402,W503 --statistics --exclude=migrations,build . bin/djfhCleaner
 
 test:
 	py.test-3 -x --cov=cinp --cov-report html --cov-report term --ds=cinp.django_settings -vv cinp
@@ -56,7 +57,7 @@ test:
 .PHONY:: test-blueprints lint-requires lint test-requires test
 
 dpkg-blueprints:
-	echo ubuntu-xenial-base ubuntu-bionic-base ubuntu-focal-base
+	echo ubuntu-bionic-base ubuntu-focal-base
 
 dpkg-requires:
 	echo dpkg-dev debhelper python3-dev python3-setuptools dh-python
@@ -75,15 +76,10 @@ dpkg-file:
 .PHONY:: dpkg-blueprints dpkg-requires dpkg-setup dpkg-file
 
 rpm-blueprints:
-	echo centos-6-base centos-7-base
+	echo centos-7-base
 
 rpm-requires:
-	echo rpm-build
-ifeq (6, $(DISTRO_MAJOR_VERSION))
-	echo python34-setuptools
-else
-	echo python36-setuptools
-endif
+	echo rpm-build python36-setuptools
 
 rpm-setup:
 	./rpmbuild-setup

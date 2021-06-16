@@ -350,7 +350,8 @@ class Converter():
 
       result = []
       if paramater.type == 'Model':
-        python_value = list( python_value.all() )  # django specific again, and really should only get the pk
+        if hasattr( python_value, 'all' ):  # ie: is QueryString or a ManyRelatedManager or simaler
+          python_value = list( python_value.all() )  # django specific again, and really should only get the pk
 
       if not isinstance( python_value, list ):
         raise ValueError( 'Must be an Array/List, got "{0}"'.format( type( python_value ).__name__ ) )
