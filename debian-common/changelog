@@ -1,3 +1,9 @@
+cinp (0.22.1-1) DIST; urgency=medium
+
+  * client now has retry
+
+ -- Peter Howe <pnhowe@gmail.com>  Tue, 22 Jun 2021 08:04:57 -0600
+
 cinp (0.21.1-1) DIST; urgency=medium
 
   * python client describe returns type
