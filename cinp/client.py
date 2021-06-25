@@ -13,7 +13,7 @@ from urllib import request
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '0.22.0'
+__CLIENT_VERSION__ = '0.23.0'
 __CINP_VERSION__ = '0.9'
 
 __all__ = [ 'Timeout', 'ResponseError', 'DetailedInvalidRequest',
@@ -28,7 +28,9 @@ DELAY_MULTIPLIER = 15
 DEFAULT_RETRY_ON = [
                      'Timeout:None',
                      'ResponseError:[Errno 101] Network is unreachable',
-                     'ResponseError:[Errno 111] Connection refused',
+                     'ResponseError:[Errno 104] Connection reset by peer',
+                     'ResponseError:Connection reset by peer',
+                     'ResponseError:[Errno 111] Connection refused'
                   ]
 
 
@@ -187,6 +189,7 @@ class CInP():
       except RetryableException as e:
         signature = '{0}:{1}'.format( e.exception.__class__.__name__, e.reason )
         if signature not in _retry_on:
+          logging.debug( 'cinp: exception signature "{0}" not in the retry_on list'.format( signature ) )
           raise e.exception
 
         logging.debug( 'cinp: got exception "{0}", ignoring...'.format( e ) )
@@ -233,8 +236,8 @@ class CInP():
     except socket.timeout:
       raise RetryableException( Timeout( 'Request Timeout after {0} seconds'.format( timeout ) ) )
 
-    except socket.error as e:
-      raise RetryableException( ResponseError( 'Socket Error "{0}"'.format( e ) ) )
+    except OSError as e:
+      raise RetryableException( ResponseError( 'Socket Error "{0}"'.format( e ) ), reason=e.strerror )
 
     http_code = resp.code
     if http_code not in ( 200, 201, 202, 400, 401, 403, 404, 500 ):

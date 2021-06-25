@@ -5,10 +5,10 @@ from django.conf import settings
 from django.db import DatabaseError, models, transaction
 from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist, ValidationError, AppRegistryNotReady
-from django.db.models import fields
+from django.db.models import fields, ProtectedError
 from django.core.files import File
 
-from cinp.server_common import Converter, Namespace, Model, Action, Paramater, Field, ServerError, checkAuth_true, checkAuth_false, MAP_TYPE_CONVERTER
+from cinp.server_common import Converter, Namespace, Model, Action, Paramater, Field, InvalidRequest, ServerError, checkAuth_true, checkAuth_false, MAP_TYPE_CONVERTER
 
 __MODEL_REGISTRY__ = {}
 
@@ -599,7 +599,11 @@ class DjangoTransaction():  # NOTE: developed on Postgres
     except ObjectDoesNotExist:
       return False
 
-    target_object.delete()
+    try:
+      target_object.delete()
+    except ProtectedError:
+      raise InvalidRequest( 'Not Deletable' )
+
     return True
 
   def start( self ):
