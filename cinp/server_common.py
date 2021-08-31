@@ -22,7 +22,7 @@ class Notset:
 notset = Notset()
 
 
-class InvalidRequest( Exception ):
+class InvalidRequest( Exception ):  # TODO: look for all the catch ValueError that might be a ValueError with data/response_data, there seems to be three ways of dealing with ValueError, needs to be cleaned up
   def __init__( self, message=None, data=None ):
     try:
       self.data = message.response_data
@@ -960,21 +960,37 @@ class Action( Element ):
       if self.static:
         raise InvalidRequest( 'Static Actions should not be passed ids' )
 
-      try:
-        if multi:
-          for object_id in id_list:
-            result[ '{0}:{1}:'.format( self.parent.path, object_id ) ] = converter.fromPython( self.return_paramater, self.func( self.parent._get( transaction, object_id ), **value_map ) )
-        else:
-          result = converter.fromPython( self.return_paramater, self.func( self.parent._get( transaction, id_list[0] ), **value_map ) )
-      except ValueError as e:
-        raise InvalidRequest( e )
+      if multi:
+        for object_id in id_list:
+          try:
+            result_value = self.func( self.parent._get( transaction, object_id ), **value_map )
+          except ValueError as e:
+            if isinstance( e.args[0], dict ):
+              raise InvalidRequest( data=e.args[0] )
+            else:
+              raise InvalidRequest( e )
+
+          try:
+            result[ '{0}:{1}:'.format( self.parent.path, object_id ) ] = converter.fromPython( self.return_paramater, result_value )
+          except ValueError as e:
+            raise InvalidRequest( 'Invalid Result Value: "{0}"'.format( e ) )
+      else:
+        result = converter.fromPython( self.return_paramater, self.func( self.parent._get( transaction, id_list[0] ), **value_map ) )
 
     else:
       if not self.static:
         raise InvalidRequest( 'Non-Static Actions should be passed ids' )
 
       try:
-        result = converter.fromPython( self.return_paramater, self.func( **value_map ) )
+        result_value = self.func( **value_map )
+      except ValueError as e:
+        if isinstance( e.args[0], dict ):
+          raise InvalidRequest( data=e.args[0] )
+        else:
+          raise InvalidRequest( e )
+
+      try:
+        result = converter.fromPython( self.return_paramater, result_value )
       except ValueError as e:
         raise InvalidRequest( 'Invalid Result Value: "{0}"'.format( e ) )
 

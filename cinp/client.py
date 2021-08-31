@@ -13,7 +13,7 @@ from urllib import request
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '0.23.0'
+__CLIENT_VERSION__ = '0.24.0'
 __CINP_VERSION__ = '0.9'
 
 __all__ = [ 'Timeout', 'ResponseError', 'DetailedInvalidRequest',
@@ -48,7 +48,7 @@ class InvalidRequest( Exception ):
 
 class DetailedInvalidRequest( InvalidRequest ):
   def __init__( self, data ):
-    for name in ( 'class', 'error', 'message' ):
+    for name in ( 'exception', 'error', 'message' ):
       setattr( self, name, None )  # this makes sure it is at least set
       try:
         setattr( self, name, data[ name ] )
