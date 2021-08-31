@@ -1,9 +1,15 @@
+cinp (0.24.0-1) DIST; urgency=medium
+
+  * better handeling of ValueErrors during calls
+
+ -- Peter Howe <pnhowe@gmail.com>  Tue, 31 Aug 2021 15:58:53 -0600
+
 cinp (0.23.0-1) DIST; urgency=medium
 
   * retry updates
   * django orm: catch protected error and return as 400
 
- -- Peter Howe <peter@BlueGoo-L>  Fri, 25 Jun 2021 12:35:15 -0600
+ -- Peter Howe <pnhowe@gmail.com>  Fri, 25 Jun 2021 12:35:15 -0600
 
 cinp (0.22.1-1) DIST; urgency=medium
 
