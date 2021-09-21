@@ -89,12 +89,26 @@ class URI():
 
       ( _, _, _, _, rec_id, _, _ ) = uri_match.groups()
       if rec_id is None:
-        raise ValueError( 'No Id in URI "{0}"'.format( uri ) )
+        continue
 
       result += rec_id.strip( ':' ).split( ':' )
 
     return result
 
+  def uriListToMultiURI( self, uri_list ):
+    """
+    runs extract Ids on the list, then takes the first uri and applies all
+    the ids to it
+    """
+    if not uri_list:
+      return []
+
+    id_list = self.extractIds( uri_list )
+    if not id_list:
+      return []
+
+    ( namespace_list, model, action, _, _ ) = self.split( uri_list[0] )
+    return self.build( namespace_list, model, action, id_list, True )
 
 # barrowed from https://www.python.org/dev/peps/pep-0257/
 def doccstring_prep( docstring ):
