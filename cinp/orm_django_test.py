@@ -126,15 +126,15 @@ def test_simple_model():
                           ( 'datetime4', '', 'DateTime', 'RO', False, False, None, None ),
                           ] ) } )
 
-  r = srv.dispatch( Request( uri='/', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.http_code == 200
   assert r.data == { 'api-version': '0.0', 'models': [], 'multi-uri-max': 100, 'name': 'root', 'namespaces': ['/Simple/'], 'path': '/' }
 
-  r = srv.dispatch( Request( uri='/Simple', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/Simple', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.http_code == 200
   assert r.data == { 'api-version': '0.1', 'models': ['/Simple/test_simple_model.<locals>.Simon'], 'multi-uri-max': 100, 'name': 'Simple', 'namespaces': [], 'path': '/Simple/' }
 
-  r = srv.dispatch( Request( uri='/Simple/test_simple_model.<locals>.Simon', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/Simple/test_simple_model.<locals>.Simon', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.data == {
                       'actions': [],
                       'constants': {},
@@ -241,12 +241,14 @@ def test_simple_model():
                       'list-filters': {},
                       'name': 'test_simple_model.<locals>.Simon',
                       'not-allowed-verbs': [],
-                      'path': '/Simple/test_simple_model.<locals>.Simon'
+                      'path': '/Simple/test_simple_model.<locals>.Simon',
+                      'query-filter-fields': [],
+                      'query-sort-fields': []
                     }
   assert r.http_code == 200
 
   # TODO: can't figure out how to "migrate" and create the table
-  # req = Request( uri='/Simple/test_simple_model.<locals>.Simon', verb='CREATE', header_map={ 'CINP-VERSION': '0.9' } )
+  # req = Request( uri='/Simple/test_simple_model.<locals>.Simon', verb='CREATE', header_map={ 'CINP-VERSION': '1.0' } )
   # req.data = { 'name': 'bob', 'description': 'The test bob' }
   # r = srv.dispatch( req )
   # assert r.data == { 'name': 'bob', 'description': 'The test bob' }
@@ -301,15 +303,15 @@ def test_multi_model():
                           ( 'viewable', '', 'Boolean', 'RW', False, False, None, True )
                           ] ) } )
 
-  r = srv.dispatch( Request( uri='/', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.http_code == 200
   assert r.data == { 'api-version': '0.0', 'models': [], 'multi-uri-max': 100, 'name': 'root', 'namespaces': ['/Simple/'], 'path': '/' }
 
-  r = srv.dispatch( Request( uri='/Simple', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/Simple', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.http_code == 200
   assert r.data == { 'api-version': '0.1', 'models': ['/Simple/test_multi_model.<locals>.Header', '/Simple/test_multi_model.<locals>.Detail'], 'multi-uri-max': 100, 'name': 'Simple', 'namespaces': [], 'path': '/Simple/' }
 
-  r = srv.dispatch( Request( uri='/Simple/test_multi_model.<locals>.Header', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/Simple/test_multi_model.<locals>.Header', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.data == {
                       'actions': [],
                       'constants': {},
@@ -334,11 +336,13 @@ def test_multi_model():
                       'list-filters': {},
                       'name': 'test_multi_model.<locals>.Header',
                       'not-allowed-verbs': [],
-                      'path': '/Simple/test_multi_model.<locals>.Header'
+                      'path': '/Simple/test_multi_model.<locals>.Header',
+                      'query-filter-fields': [],
+                      'query-sort-fields': []
                     }
   assert r.http_code == 200
 
-  r = srv.dispatch( Request( uri='/Simple/test_multi_model.<locals>.Detail', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/Simple/test_multi_model.<locals>.Detail', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.data == {
                       'actions': [],
                       'constants': {},
@@ -369,7 +373,9 @@ def test_multi_model():
                       'list-filters': {},
                       'name': 'test_multi_model.<locals>.Detail',
                       'not-allowed-verbs': [],
-                      'path': '/Simple/test_multi_model.<locals>.Detail'
+                      'path': '/Simple/test_multi_model.<locals>.Detail',
+                      'query-filter-fields': [],
+                      'query-sort-fields': []
                     }
   assert r.http_code == 200
 
@@ -422,15 +428,15 @@ def test_multi_model_manytomany():
                           ( 'viewable', '', 'Boolean', 'RW', True, False, None, None )
                           ] ) } )
 
-  r = srv.dispatch( Request( uri='/', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.http_code == 200
   assert r.data == { 'api-version': '0.0', 'models': [], 'multi-uri-max': 100, 'name': 'root', 'namespaces': ['/Simple/'], 'path': '/' }
 
-  r = srv.dispatch( Request( uri='/Simple', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/Simple', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.http_code == 200
   assert r.data == { 'api-version': '0.1', 'models': ['/Simple/test_multi_model_manytomany.<locals>.Header', '/Simple/test_multi_model_manytomany.<locals>.Detail'], 'multi-uri-max': 100, 'name': 'Simple', 'namespaces': [], 'path': '/Simple/' }
 
-  r = srv.dispatch( Request( uri='/Simple/test_multi_model_manytomany.<locals>.Header', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/Simple/test_multi_model_manytomany.<locals>.Header', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.data == {
                       'actions': [],
                       'constants': {},
@@ -455,11 +461,13 @@ def test_multi_model_manytomany():
                       'list-filters': {},
                       'name': 'test_multi_model_manytomany.<locals>.Header',
                       'not-allowed-verbs': [],
-                      'path': '/Simple/test_multi_model_manytomany.<locals>.Header'
+                      'path': '/Simple/test_multi_model_manytomany.<locals>.Header',
+                      'query-filter-fields': [],
+                      'query-sort-fields': []
                     }
   assert r.http_code == 200
 
-  r = srv.dispatch( Request( uri='/Simple/test_multi_model_manytomany.<locals>.Detail', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/Simple/test_multi_model_manytomany.<locals>.Detail', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.data == {
                       'actions': [],
                       'constants': {},
@@ -491,7 +499,9 @@ def test_multi_model_manytomany():
                       'list-filters': {},
                       'name': 'test_multi_model_manytomany.<locals>.Detail',
                       'not-allowed-verbs': [],
-                      'path': '/Simple/test_multi_model_manytomany.<locals>.Detail'
+                      'path': '/Simple/test_multi_model_manytomany.<locals>.Detail',
+                      'query-filter-fields': [],
+                      'query-sort-fields': []
                     }
   assert r.http_code == 200
 
@@ -558,15 +568,15 @@ def test_multi_through_model_manytomany():
                           ( 'extra', '', 'String', 'RW', False, False, None, None ),
                           ] ) } )
 
-  r = srv.dispatch( Request( uri='/', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.http_code == 200
   assert r.data == { 'api-version': '0.0', 'models': [], 'multi-uri-max': 100, 'name': 'root', 'namespaces': ['/Simple/'], 'path': '/' }
 
-  r = srv.dispatch( Request( uri='/Simple', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/Simple', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.http_code == 200
   assert r.data == { 'api-version': '0.1', 'models': ['/Simple/test_multi_through_model_manytomany.<locals>.Header', '/Simple/test_multi_through_model_manytomany.<locals>.Detail', '/Simple/test_multi_through_model_manytomany.<locals>.HeaderDetail'], 'multi-uri-max': 100, 'name': 'Simple', 'namespaces': [], 'path': '/Simple/' }
 
-  r = srv.dispatch( Request( uri='/Simple/test_multi_through_model_manytomany.<locals>.Header', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/Simple/test_multi_through_model_manytomany.<locals>.Header', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.data == {
                       'actions': [],
                       'constants': {},
@@ -581,11 +591,13 @@ def test_multi_through_model_manytomany():
                       'list-filters': {},
                       'name': 'test_multi_through_model_manytomany.<locals>.Header',
                       'not-allowed-verbs': [],
-                      'path': '/Simple/test_multi_through_model_manytomany.<locals>.Header'
+                      'path': '/Simple/test_multi_through_model_manytomany.<locals>.Header',
+                      'query-filter-fields': [],
+                      'query-sort-fields': []
                     }
   assert r.http_code == 200
 
-  r = srv.dispatch( Request( uri='/Simple/test_multi_through_model_manytomany.<locals>.Detail', verb='DESCRIBE', header_map={ 'CINP-VERSION': '0.9' } ) )
+  r = srv.dispatch( Request( uri='/Simple/test_multi_through_model_manytomany.<locals>.Detail', verb='DESCRIBE', header_map={ 'CINP-VERSION': '1.0' } ) )
   assert r.data == {
                       'actions': [],
                       'constants': {},
@@ -612,6 +624,8 @@ def test_multi_through_model_manytomany():
                       'list-filters': {},
                       'name': 'test_multi_through_model_manytomany.<locals>.Detail',
                       'not-allowed-verbs': [],
-                      'path': '/Simple/test_multi_through_model_manytomany.<locals>.Detail'
+                      'path': '/Simple/test_multi_through_model_manytomany.<locals>.Detail',
+                      'query-filter-fields': [],
+                      'query-sort-fields': []
                     }
   assert r.http_code == 200

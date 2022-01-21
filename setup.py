@@ -30,7 +30,7 @@ the Business Logic and permissions to be fully encapsulated on the Server.""",
        author='Peter Howe',
        author_email='pnhowe@gmail.com',
        url='https://github.com/cinp/python',
-       python='~=3.4',
+       python='~=3.6',
        license='Apache2',
        classifiers=[
            'Development Status :: 5 - Production/Stable',

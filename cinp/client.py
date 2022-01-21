@@ -13,8 +13,8 @@ from urllib import request
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '0.24.0'
-__CINP_VERSION__ = '0.9'
+__CLIENT_VERSION__ = '1.0.0'
+__CINP_VERSION__ = '1.0'
 
 __all__ = [ 'Timeout', 'ResponseError', 'DetailedInvalidRequest',
             'InvalidRequest', 'InvalidSession', 'NotAuthorized',

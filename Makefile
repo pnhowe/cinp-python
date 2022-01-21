@@ -32,6 +32,7 @@ dist-clean: clean
 	$(RM) -fr rpmbuild
 	$(RM) -f dpkg-setup
 	$(RM) -f rpm-setup
+	$(RM) -f test-setup
 	$(RM) -fr dist
 	$(RM) -fr cinp.egg-info
 

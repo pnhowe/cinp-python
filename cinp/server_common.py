@@ -8,7 +8,7 @@ from urllib import parse
 from cinp.common import URI, doccstring_prep
 from cinp.readers import READER_REGISTRY
 
-__CINP_VERSION__ = '0.9'
+__CINP_VERSION__ = '1.0'
 __MULTI_URI_MAX__ = 100
 
 FIELD_TYPE_LIST = ( 'String', 'Integer', 'Float', 'Boolean', 'DateTime', 'Map', 'Model', 'File' )
@@ -229,6 +229,9 @@ class Converter():
     if paramater.type == 'Model':
       if cinp_value is None or cinp_value == '':
         return None
+
+      if not isinstance( cinp_value, str ):
+        raise ValueError( 'Model refrence must be a string uri' )
 
       ( path, model, action, id_list, multi ) = self.uri.split( cinp_value )
 
@@ -580,7 +583,7 @@ class Namespace( Element ):
 
 
 class Model( Element ):
-  def __init__( self, field_list, transaction_class, id_field_name=None, list_filter_map=None, constant_set_map=None, not_allowed_verb_list=None, *args, **kwargs ):
+  def __init__( self, field_list, transaction_class, id_field_name=None, list_filter_map=None, list_query_filter_map=None, list_query_sort_list=None, constant_set_map=None, not_allowed_verb_list=None, *args, **kwargs ):
     super().__init__( *args, **kwargs )
     self.transaction_class = transaction_class
     self.id_field_name = id_field_name
@@ -593,6 +596,8 @@ class Model( Element ):
 
     self.action_map = {}
     self.list_filter_map = list_filter_map or {}  # TODO: check list_filter_map  for  saninty, should  be [ filter_name ][ paramater_name ] = Paramater
+    self.list_query_filter_map = list_query_filter_map or {}  # TODO: check this too
+    self.list_query_sort_list = list_query_sort_list or []
     self.constant_set_map = constant_set_map or {}
     self.not_allowed_verb_list = []
     for verb in not_allowed_verb_list or []:
@@ -645,6 +650,8 @@ class Model( Element ):
     data[ 'list-filters' ] = {}
     for name in self.list_filter_map:
       data[ 'list-filters' ][ name ] = [ item.describe( converter ) for item in self.list_filter_map[ name ].values() ]
+    data[ 'query-filter-fields' ] = [ item.describe( converter ) for item in self.list_query_filter_map.values() ]
+    data[ 'query-sort-fields' ] = self.list_query_sort_list
 
     return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Model', 'Cache-Control': 'max-age=0' } )
 
@@ -713,20 +720,40 @@ class Model( Element ):
       if data is None:
         raise InvalidRequest( 'Filter Paramaters are required when Filter Name is specified' )
 
-      try:
-        paramater_map = self.list_filter_map[ filter_name ]
-      except KeyError:
-        raise InvalidRequest( 'Invalid Filter Name "{0}"'.format( filter_name ) )
-
       error_map = {}
-      for paramater_name in paramater_map:
-        paramater = paramater_map[ paramater_name ]
+      if filter_name == '_query_':
+        filter_values, error_list = self._filterConvert( data.get( 'filter', {} ), self.list_query_filter_map, converter, transaction )
+        if error_list:
+          error_map[ 'filter' ] = error_list
+
+        sort_list = data.get( 'sort', [] )
+        if not isinstance( sort_list, list ):
+          sort_list = [ sort_list ]
+
+        for entry in sort_list:
+          if not isinstance( entry, str ):
+            raise InvalidRequest( data={ 'sort': 'All Sort Fields must be a string' } )
+
+        invalid_sort_list = list( set( sort_list ) - set( self.list_query_sort_list ) )
+        if invalid_sort_list:
+          raise InvalidRequest( data={ 'sort': 'Invalid Filter Sort Field(s): "{0}"'.format( ', '.join( invalid_sort_list ) ) } )
+
+        filter_values = { 'filter': filter_values, 'sort': sort_list }
+
+      else:
         try:
-          filter_values[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
-        except ValueError as e:
-          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( e )
+          paramater_map = self.list_filter_map[ filter_name ]
         except KeyError:
-          error_map[ paramater_name ] = 'Required Paramater'
+          raise InvalidRequest( 'Invalid Filter Name "{0}"'.format( filter_name ) )
+
+        for paramater_name in paramater_map:
+          paramater = paramater_map[ paramater_name ]
+          try:
+            filter_values[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
+          except ValueError as e:
+            error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( e )
+          except KeyError:
+            error_map[ paramater_name ] = 'Required Paramater'
 
       if error_map != {}:
         raise InvalidRequest( data=error_map )
@@ -749,6 +776,50 @@ class Model( Element ):
       id_list = [ '{0}:{1}:'.format( self.path, item ) for item in id_list ]
 
     return Response( 200, data=id_list, header_map={ 'Verb': 'LIST', 'Cache-Control': 'no-cache', 'Count': str( len( id_list ) ), 'Position': str( position ), 'Total': str( total ), 'Id-Only': str( id_only ) } )
+
+  def _filterConvert( self, filter_spec_map, paramater_map, converter, transaction ):
+    if not filter_spec_map:
+      return {}, []
+
+    operation = filter_spec_map.get( 'operation', None )
+    field = filter_spec_map.get( 'field', None )
+    if field is not None:
+      if field not in self.list_query_filter_map.keys():
+        return {}, [ 'Invalid Filter Field: "{0}"'.format( field ) ]
+
+      try:
+        value = filter_spec_map[ 'value' ]
+      except KeyError:
+        return {}, [ 'Value Must be Specified for Filtering Entries' ]
+
+      try:
+        value = converter.toPython( paramater_map[ field ], value, transaction )
+      except ValueError as e:
+        return {}, [ 'Invalid Value "{0}" for field "{1}"'.format( e, field ) ]
+
+      if operation not in ( '=', '<', '>', '<=', '>=' ):
+        return {}, [ 'Invalid Filter Operation: "{0}"'.format( operation ) ]
+
+      return { 'field': field, 'value': value, 'operation': operation }, []
+
+    if operation is not None:
+      if operation not in ( 'not', 'or', 'and' ):
+        return {}, [ 'Invalid Operation "{0}"'.format( operation ) ]
+
+      right = filter_spec_map.get( 'right', None )
+      left = filter_spec_map.get( 'left', None )
+      if operation == 'not' and right is not None:
+        right, right_error_list = self._filterConvert( right, paramater_map, converter, transaction )
+        return { 'operation': 'not', 'right': right }, right_error_list
+
+      if operation in ( 'or', 'and' ) and left is not None and right is not None:
+        left, left_error_list = self._filterConvert( left, paramater_map, converter, transaction )
+        right, right_error_list = self._filterConvert( right, paramater_map, converter, transaction )
+        return { 'operation': operation, 'left': left, 'right': right }, left_error_list + right_error_list
+
+      return {}, [ 'Unknown/Invalid Operation and Paramaters: "{0}", Right is none: {1}, Left is none: {2}'.format( operation, right is None, left is None ) ]
+
+    return {}, [ 'Operation and/or Field not Defined' ]
 
   def create( self, converter, transaction, data ):
     if not isinstance( data, dict ):
@@ -1028,7 +1099,7 @@ class Server():
         ( mode, is_array, new_model ) = field.model_resolve( field.model )  # this is django specific again
         del field.model_resolve
         if not isinstance( new_model, Model ):
-          raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+          raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
 
         if mode is not None:
           field.mode = mode
@@ -1043,7 +1114,7 @@ class Server():
           new_model = action.return_paramater.model_resolve( action.return_paramater.model )  # this is django specific again
           del action.return_paramater.model_resolve
           if not isinstance( new_model, Model ):
-            raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+            raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
 
           action.return_paramater.model = new_model
 
@@ -1054,7 +1125,7 @@ class Server():
             new_model = paramater.model_resolve( paramater.model )  # this is django specific again
             del paramater.model_resolve
             if not isinstance( new_model, Model ):
-              raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+              raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
 
             paramater.model = new_model
 
@@ -1066,9 +1137,19 @@ class Server():
             new_model = paramater.model_resolve( paramater.model )  # this is django specific again
             del paramater.model_resolve
             if not isinstance( new_model, Model ):
-              raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+              raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
 
             paramater.model = new_model
+
+      # for paramater_name in model.list_query_map:
+      #   paramater = model.list_query_map[ paramater_name ]
+      #   if paramater.type == 'Model' and hasattr( paramater, 'model_resolve' ):
+      #     new_model = paramater.model_resolve( paramater.model )  # this is django specific again
+      #     del paramater.model_resolve
+      #     if not isinstance( new_model, Model ):
+      #       raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+      #
+      #     paramater.model = new_model
 
   def _validateNamespace( self, namespace ):
     for name in namespace.element_map:

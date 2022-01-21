@@ -62,7 +62,7 @@ def test_werkzeug_request():
           'REMOTE_ADDR': '127.0.0.1',
           'REQUEST_METHOD': 'DELETE',
           'CONTENT_TYPE': 'application/json;charset=utf-8',
-          'HTTP_CINP_VERSION': '0.9',
+          'HTTP_CINP_VERSION': '1.0',
           'HTTP_CONNECTION': 'keep-alive',
           'HTTP_POSITION': 50,
           'HTTP_COUNT': 34,
@@ -74,7 +74,7 @@ def test_werkzeug_request():
   req = WerkzeugRequest( env )
   assert req.verb == 'DELETE'
   assert req.uri == '/api/ns/model:key:'
-  assert req.header_map == { 'CINP-VERSION': '0.9', 'CONTENT-TYPE': 'application/json;charset=utf-8', 'FILTER': 'curent', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'kd8dkv&TTIv893ink', 'POSITION': '50', 'COUNT': '34', 'MULTI-OBJECT': 'True' }
+  assert req.header_map == { 'CINP-VERSION': '1.0', 'CONTENT-TYPE': 'application/json;charset=utf-8', 'FILTER': 'curent', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'kd8dkv&TTIv893ink', 'POSITION': '50', 'COUNT': '34', 'MULTI-OBJECT': 'True' }
   assert req.data == { 'this': 'works' }
 
 
@@ -110,7 +110,7 @@ def test_werkzeug_server():
 
   env = {
           'PATH_INFO': '/api/',
-          'HTTP_CINP_VERSION': '0.9',
+          'HTTP_CINP_VERSION': '1.0',
           'REQUEST_METHOD': 'DESCRIBE',
           'wsgi.url_scheme': 'http',
           'wsgi.input_terminated': True,
@@ -118,5 +118,5 @@ def test_werkzeug_server():
         }
   wresp = server.handle( env )
   assert wresp.status_code == 200
-  assert wresp.headers == Headers( [ ( 'Cache-Control', 'max-age=0' ), ( 'Cinp-Version', '0.9' ), ( 'Content-Type', 'application/json;charset=utf-8' ), ( 'Content-Length', '120' ), ( 'Verb', 'DESCRIBE' ), ( 'Type', 'Namespace' ) ] )
+  assert wresp.headers == Headers( [ ( 'Cache-Control', 'max-age=0' ), ( 'Cinp-Version', '1.0' ), ( 'Content-Type', 'application/json;charset=utf-8' ), ( 'Content-Length', '120' ), ( 'Verb', 'DESCRIBE' ), ( 'Type', 'Namespace' ) ] )
   assert json.loads( str( wresp.data, 'utf-8' ) ) == { 'multi-uri-max': 100, 'api-version': '0.0', 'path': '/api/', 'namespaces': [ '/api/ns1/' ], 'models': [], 'name': 'root' }

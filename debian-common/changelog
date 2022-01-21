@@ -1,3 +1,10 @@
+cinp (1.0.0-1) DIST; urgency=medium
+
+  * Version 1.0
+  * finally implemented (semi) client defined filtering
+
+ -- Peter Howe <pnhowe@gmail.com>  Fri, 21 Jan 2022 10:27:53 -0700
+
 cinp (0.24.0-1) DIST; urgency=medium
 
   * better handeling of ValueErrors during calls

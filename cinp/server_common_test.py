@@ -239,10 +239,10 @@ def test_model():
 
   model1 = Model( name='model1', transaction_class=TestTransaction, field_list=[] )
   assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [], 'multi-uri-max': 100 }
-  assert sort_dsc( model1.describe( ns.converter ).data ) == { 'name': 'model1', 'path': None, 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [] }
+  assert sort_dsc( model1.describe( ns.converter ).data ) == { 'name': 'model1', 'path': None, 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [], 'query-filter-fields': [], 'query-sort-fields': [] }
   ns.addElement( model1 )
   assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1' ], 'multi-uri-max': 100 }
-  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [] }
+  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [], 'query-filter-fields': [], 'query-sort-fields': [] }
 
   field_list = []
   field_list.append( Field( name='field1', type='String', length=50 ) )
@@ -250,12 +250,12 @@ def test_model():
 
   model2 = Model( name='model2', transaction_class=TestTransaction, field_list=field_list, id_field_name='field2' )
   assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1' ], 'multi-uri-max': 100 }
-  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [] }
-  assert sort_dsc( model2.describe( ns.converter ).data ) == { 'name': 'model2', 'path': None, 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True, }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'actions': [], 'constants': {}, 'id-field-name': 'field2', 'list-filters': {}, 'not-allowed-verbs': [] }
+  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [], 'query-filter-fields': [], 'query-sort-fields': [] }
+  assert sort_dsc( model2.describe( ns.converter ).data ) == { 'name': 'model2', 'path': None, 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True, }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'actions': [], 'constants': {}, 'id-field-name': 'field2', 'list-filters': {}, 'not-allowed-verbs': [], 'query-filter-fields': [], 'query-sort-fields': [] }
   ns.addElement( model2 )
   assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1', '/api/model2' ], 'multi-uri-max': 100 }
-  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [] }
-  assert sort_dsc( model2.describe( model2.parent.converter ).data ) == { 'name': 'model2', 'path': '/api/model2', 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'actions': [], 'constants': {}, 'id-field-name': 'field2', 'list-filters': {}, 'not-allowed-verbs': [] }
+  assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [], 'query-filter-fields': [], 'query-sort-fields': [] }
+  assert sort_dsc( model2.describe( model2.parent.converter ).data ) == { 'name': 'model2', 'path': '/api/model2', 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'actions': [], 'constants': {}, 'id-field-name': 'field2', 'list-filters': {}, 'not-allowed-verbs': [], 'query-filter-fields': [], 'query-sort-fields': [] }
 
   assert model2.describe( model2.parent.converter ).header_map == { 'Cache-Control': 'max-age=0', 'Verb': 'DESCRIBE', 'Type': 'Model' }
 
@@ -563,15 +563,15 @@ def test_getElement():
 
 
 def test_request():
-  req = Request( 'DESCRIBE', '/api/v1/ns/model', { 'CINP-VERSION': '0.9', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'stuff', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50, 'Multi-Object': 'True' } )
+  req = Request( 'DESCRIBE', '/api/v1/ns/model', { 'CINP-VERSION': '1.0', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'stuff', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50, 'Multi-Object': 'True' } )
   assert req.verb == 'DESCRIBE'
   assert req.uri == '/api/v1/ns/model'
-  assert req.header_map == { 'CINP-VERSION': '0.9', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'stuff', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50 }
+  assert req.header_map == { 'CINP-VERSION': '1.0', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'stuff', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50 }
 
-  req = Request( 'GET', '/api/v2/model:key:', { 'CINP-VERSION': '0.9', 'USER-AGENT': 'mybrowser' } )
+  req = Request( 'GET', '/api/v2/model:key:', { 'CINP-VERSION': '1.0', 'USER-AGENT': 'mybrowser' } )
   assert req.verb == 'GET'
   assert req.uri == '/api/v2/model:key:'
-  assert req.header_map == { 'CINP-VERSION': '0.9' }
+  assert req.header_map == { 'CINP-VERSION': '1.0' }
 
   req.fromJSON( '"My Text"' )
   assert req.data == 'My Text'
@@ -615,19 +615,19 @@ def test_saninity_checks():
   model.addAction( action )
   server.registerNamespace( '/', ns )
 
-  res = server.dispatch( Request( 'BOB', '/api/', { 'CINP-VERSION': '0.9' } ) )
+  res = server.dispatch( Request( 'BOB', '/api/', { 'CINP-VERSION': '1.0' } ) )
   assert res.http_code == 400
   assert res.data == { 'message': 'Invalid Verb (HTTP Method) "BOB"' }
 
-  res = server.dispatch( Request( 'DESCRIBE', 'invalid', { 'CINP-VERSION': '0.9' } ) )
+  res = server.dispatch( Request( 'DESCRIBE', 'invalid', { 'CINP-VERSION': '1.0' } ) )
   assert res.http_code == 400
   assert res.data == { 'message': 'Unable to Parse "invalid"' }
 
-  res = server.dispatch( Request( 'DESCRIBE', '/api/ns/model:' + ':'.join( 'id' * 101 ) + ':', { 'CINP-VERSION': '0.9' } ) )
+  res = server.dispatch( Request( 'DESCRIBE', '/api/ns/model:' + ':'.join( 'id' * 101 ) + ':', { 'CINP-VERSION': '1.0' } ) )
   assert res.http_code == 400
   assert res.data == { 'message': 'id_list longer than supported length of "100"' }
 
-  res = server.dispatch( Request( 'DESCRIBE', '/api/nope', { 'CINP-VERSION': '0.9' } ) )
+  res = server.dispatch( Request( 'DESCRIBE', '/api/nope', { 'CINP-VERSION': '1.0' } ) )
   assert res.http_code == 404
   assert res.data == { 'message': 'path not found "/api/nope"' }
 
@@ -640,59 +640,59 @@ def test_saninity_checks():
   assert res.data == { 'message': 'Invalid CInP Protocol Version' }
 
   with pytest.raises( ValueError ):  # checkAuth not implemented, for this round of tests we call good
-    server.dispatch( Request( 'DESCRIBE', '/api/ns/model(action)', { 'CINP-VERSION': '0.9' } ) )
+    server.dispatch( Request( 'DESCRIBE', '/api/ns/model(action)', { 'CINP-VERSION': '1.0' } ) )
 
   for verb in ( 'GET', 'LIST', 'CREATE', 'UPDATE', 'DELETE' ):
-    res = server.dispatch( Request( verb, '/api/ns/model(action)', { 'CINP-VERSION': '0.9' } ) )
+    res = server.dispatch( Request( verb, '/api/ns/model(action)', { 'CINP-VERSION': '1.0' } ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Invalid verb "{0}" for request with action'.format( verb ) }
 
   for verb in ( 'GET', 'LIST', 'CREATE', 'UPDATE', 'DELETE' ):
-    res = server.dispatch( Request( verb, '/api/ns/model:id:(action)', { 'CINP-VERSION': '0.9' } ) )
+    res = server.dispatch( Request( verb, '/api/ns/model:id:(action)', { 'CINP-VERSION': '1.0' } ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Invalid verb "{0}" for request with action'.format( verb ) }
 
   for uri in ( '/api/', '/api/ns/', '/api/ns/model', '/api/ns/model:id:' ):
-    res = server.dispatch( Request( 'CALL', uri, { 'CINP-VERSION': '0.9' } ) )
+    res = server.dispatch( Request( 'CALL', uri, { 'CINP-VERSION': '1.0' } ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Verb "CALL" requires action' }
 
   for verb in ( 'LIST', 'CREATE', 'DESCRIBE' ):
-    res = server.dispatch( Request( verb, '/api/ns/model:id:', { 'CINP-VERSION': '0.9' } ) )
+    res = server.dispatch( Request( verb, '/api/ns/model:id:', { 'CINP-VERSION': '1.0' } ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Invalid Verb "{0}" for request with id'.format( verb ) }
 
   for verb in ( 'GET', 'UPDATE', 'DELETE' ):
-    res = server.dispatch( Request( verb, '/api/ns/model', { 'CINP-VERSION': '0.9' } ) )
+    res = server.dispatch( Request( verb, '/api/ns/model', { 'CINP-VERSION': '1.0' } ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Verb "{0}" requires id'.format( verb ) }
 
   for verb in ( 'GET', 'DELETE' ):
-    req = Request( verb, '/api/ns/model:d:', { 'CINP-VERSION': '0.9' } )
+    req = Request( verb, '/api/ns/model:d:', { 'CINP-VERSION': '1.0' } )
     req.data = { 'some': 'data' }
     res = server.dispatch( req )
     assert res.http_code == 400
     assert res.data == { 'message': 'Invalid verb "{0}" for request with data'.format( verb ) }
 
   for verb in ( 'DESCRIBE', ):
-    req = Request( verb, '/api/ns/model', { 'CINP-VERSION': '0.9' } )
+    req = Request( verb, '/api/ns/model', { 'CINP-VERSION': '1.0' } )
     req.data = { 'some': 'data' }
     res = server.dispatch( req )
     assert res.http_code == 400
     assert res.data == { 'message': 'Invalid verb "{0}" for request with data'.format( verb ) }
 
   for verb in ( 'UPDATE', ):
-    res = server.dispatch( Request( verb, '/api/ns/model:id:', { 'CINP-VERSION': '0.9' } ) )
+    res = server.dispatch( Request( verb, '/api/ns/model:id:', { 'CINP-VERSION': '1.0' } ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Verb "{0}" requires data'.format( verb ) }
 
   for verb in ( 'CREATE', ):
-    res = server.dispatch( Request( verb, '/api/ns/model', { 'CINP-VERSION': '0.9' } ) )
+    res = server.dispatch( Request( verb, '/api/ns/model', { 'CINP-VERSION': '1.0' } ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Verb "{0}" requires data'.format( verb ) }
 
   for verb in ( 'LIST', 'CREATE' ):  # also 'GET', 'UPDATE', 'DELETE' which also requires an Id which requires a model so already covered
-    req = Request( verb, '/api/ns/', { 'CINP-VERSION': '0.9' } )
+    req = Request( verb, '/api/ns/', { 'CINP-VERSION': '1.0' } )
     req.data = { 'some': 'data' }
     res = server.dispatch( req )
     assert res.http_code == 400
@@ -717,7 +717,7 @@ def test_server():
   req = Request( 'OPTIONS', '/api/', {} )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Allow': 'OPTIONS, DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '0.9' }
+  assert res.header_map == { 'Allow': 'OPTIONS, DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '1.0' }
 
   path = '/api/'
   desc_ref = sort_dsc( { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns1/', '/api/ns2/' ], 'models': [], 'multi-uri-max': 100 } )
@@ -726,7 +726,7 @@ def test_server():
   res = server.handle( req )
   assert res.http_code == 200
   assert sort_dsc( res.data ) == desc_ref
-  assert res.header_map == { 'Type': 'Namespace', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '0.9' }
+  assert res.header_map == { 'Type': 'Namespace', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '1.0' }
 
   path = '/api/ns1/'
   desc_ref = sort_dsc( { 'name': 'ns1', 'path': '/api/ns1/', 'api-version': '0.1', 'namespaces': [], 'models': [ '/api/ns1/model1', '/api/ns1/model2' ], 'multi-uri-max': 100 } )
@@ -735,16 +735,16 @@ def test_server():
   res = server.handle( req )
   assert res.http_code == 200
   assert sort_dsc( res.data ) == desc_ref
-  assert res.header_map == { 'Type': 'Namespace', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '0.9' }
+  assert res.header_map == { 'Type': 'Namespace', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '1.0' }
 
   path = '/api/ns1/model1'
-  desc_ref = sort_dsc( { 'name': 'model1', 'path': '/api/ns1/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [] } )
+  desc_ref = sort_dsc( { 'name': 'model1', 'path': '/api/ns1/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [], 'query-filter-fields': [], 'query-sort-fields': [] } )
   assert sort_dsc( server.root_namespace.getElement( server.uri.split( path ) ).describe( ns1.converter ).data ) == desc_ref
   req = Request( 'DESCRIBE', path, { 'CINP-VERSION': __CINP_VERSION__ } )
   res = server.handle( req )
   assert res.http_code == 200
   assert sort_dsc( res.data ) == desc_ref
-  assert res.header_map == { 'Type': 'Model', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '0.9' }
+  assert res.header_map == { 'Type': 'Model', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '1.0' }
 
   # TODO: more more more
 
@@ -761,31 +761,31 @@ def test_multi():
   req = Request( 'GET', '/api/ns1/model1:abc:', { 'CINP-VERSION': __CINP_VERSION__ } )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Verb': 'GET', 'Multi-Object': 'False' }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '1.0', 'Verb': 'GET', 'Multi-Object': 'False' }
   assert res.data == { '_extra_': 'get "abc"' }
 
   req = Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__ } )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Verb': 'GET', 'Multi-Object': 'True' }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '1.0', 'Verb': 'GET', 'Multi-Object': 'True' }
   assert res.data == { '/api/ns1/model1:abc:': { '_extra_': 'get "abc"' }, '/api/ns1/model1:def:': { '_extra_': 'get "def"' } }
 
   req = Request( 'GET', '/api/ns1/model1:abc:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'true' } )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Verb': 'GET', 'Multi-Object': 'True' }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '1.0', 'Verb': 'GET', 'Multi-Object': 'True' }
   assert res.data == { '/api/ns1/model1:abc:': { '_extra_': 'get "abc"' } }
 
   req = Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'true' } )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '0.9', 'Verb': 'GET', 'Multi-Object': 'True' }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '1.0', 'Verb': 'GET', 'Multi-Object': 'True' }
   assert res.data == { '/api/ns1/model1:abc:': { '_extra_': 'get "abc"' }, '/api/ns1/model1:def:': { '_extra_': 'get "def"' } }
 
   req = Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'false' } )
   res = server.handle( req )
   assert res.http_code == 400
-  assert res.header_map == { 'Cinp-Version': '0.9' }
+  assert res.header_map == { 'Cinp-Version': '1.0' }
   assert res.data == { 'message': 'requested non multi-object, however multiple ids where sent' }
 
 

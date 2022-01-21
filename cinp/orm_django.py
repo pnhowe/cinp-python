@@ -3,6 +3,7 @@ import random
 import django
 from django.conf import settings
 from django.db import DatabaseError, models, transaction
+from django.db.models import Q
 from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist, ValidationError, AppRegistryNotReady
 from django.db.models import fields, ProtectedError
@@ -195,6 +196,8 @@ class DjangoCInP():
     self.action_map = {}
     self.check_auth_map = {}
     self.list_filter_map = {}
+    self.list_query_filter_map = {}
+    self.list_query_sort_map = {}
 
   def _getTransactionClass( self, cls ):
     if settings.DATABASES[ cls._meta.default_manager.db ][ 'ENGINE' ] == 'django.db.backends.sqlite3':
@@ -373,14 +376,19 @@ class DjangoCInP():
         filter_funcs_map[ filter_name ] = self.list_filter_map[ name ][ filter_name ][0]
         filter_map[ filter_name ] = self.list_filter_map[ name ][ filter_name ][1]
 
+      list_query_filter = self.list_query_filter_map.get( name, ( {}, None ) )
+      list_query_sort = self.list_query_sort_map.get( name, ( {}, None ) )
+
       try:
         doc = cls.__doc__.strip()
       except AttributeError:
         doc = None
 
-      model = Model( name=name, doc=doc, id_field_name=pk_field_name, transaction_class=self._getTransactionClass( cls ), field_list=field_list, list_filter_map=filter_map, constant_set_map=constant_set_map, not_allowed_verb_list=not_allowed_verb_list )
+      model = Model( name=name, doc=doc, id_field_name=pk_field_name, transaction_class=self._getTransactionClass( cls ), field_list=field_list, list_filter_map=filter_map, list_query_filter_map=list_query_filter[1], list_query_sort_list=list_query_sort[1], constant_set_map=constant_set_map, not_allowed_verb_list=not_allowed_verb_list )
       model._django_model = cls
       model._django_filter_funcs_map = filter_funcs_map
+      model._django_query_filter = list_query_filter[0]
+      model._django_query_sort = list_query_sort[0]
       self.model_list.append( model )
       __MODEL_REGISTRY__[ '{0}.{1}'.format( cls.__module__, cls.__name__ ) ] = model
       MAP_TYPE_CONVERTER[ cls.__name__ ] = lambda a: model.path + ':{0}:'.format( a.pk )
@@ -398,7 +406,7 @@ class DjangoCInP():
       except AttributeError:
         doc = None
 
-      model = Model( name=name, doc=doc, transaction_class=DjangoTransaction, field_list=[], list_filter_map={}, constant_set_map={}, not_allowed_verb_list=not_allowed_verb_list_ )
+      model = Model( name=name, doc=doc, id_field_name=None, transaction_class=DjangoTransaction, field_list=[], list_filter_map={}, constant_set_map={}, not_allowed_verb_list=not_allowed_verb_list_ )
       self.model_list.append( model )
       return cls
 
@@ -513,6 +521,32 @@ class DjangoCInP():
 
     return decorator
 
+  def list_query_filter( self, field_list ):
+    def decorator( func ):
+      if type( func ).__name__ != 'staticmethod':
+        raise ValueError( 'list_query_filter func must be a staticmethod' )
+
+      filter_map = {}
+      for filter in field_list:
+        filter_map[ filter[ 'name' ] ] = paramater_type_to_paramater( filter, { 'name': filter[ 'name' ] } )
+
+      model_name_parts = func.__func__.__qualname__.split( '.' )
+      self.list_query_filter_map[ '.'.join( model_name_parts[ :-1 ] ) ] = ( func.__func__, filter_map )
+      return func
+
+    return decorator
+
+  def list_query_sort( self, field_list ):
+    def decorator( func ):
+      if type( func ).__name__ != 'staticmethod':
+        raise ValueError( 'list_query_sort func must be a staticmethod' )
+
+      model_name_parts = func.__func__.__qualname__.split( '.' )
+      self.list_query_sort_map[ '.'.join( model_name_parts[ :-1 ] ) ] = ( func.__func__, field_list )
+      return func
+
+    return decorator
+
 
 class DjangoTransaction():  # NOTE: developed on Postgres
   def __init__( self ):
@@ -578,6 +612,17 @@ class DjangoTransaction():  # NOTE: developed on Postgres
   def list( self, model, filter_name, filter_values, position, count ):
     if filter_name is None:
       qs = model._django_model.objects.all()
+
+    elif filter_name == '_query_':
+      q_filter = self._filter( filter_values[ 'filter' ], model )
+      qs = model._django_model.objects.filter( q_filter )
+      if filter_values[ 'sort' ]:
+        sort_list = [ model._django_query_sort( i ) for i in filter_values[ 'sort' ] ]
+        if None in sort_list:
+          raise ValueError( 'Invalid Sort Field' )
+
+        qs = qs.order_by( *sort_list )
+
     else:
       try:
         filter_func = model._django_filter_funcs_map[ filter_name ]
@@ -592,6 +637,39 @@ class DjangoTransaction():  # NOTE: developed on Postgres
     qs = qs.values_list( 'pk' )
 
     return ( [ item[0] for item in qs[ position:position + count ] ], position, qs.count() )
+
+  def _filter( self, filter_spec_map, model ):
+    if not filter_spec_map:
+      return Q()
+
+    operation = filter_spec_map.get( 'operation', None )
+    field = filter_spec_map.get( 'field', None )
+    if field is not None:
+      try:
+        operation = { '=': 'exact', '<': 'lt', '>': 'gt', '<=': 'lte', '>=': 'gte' }[ operation ]
+      except KeyError:
+        raise ValueError( 'Invalid Filter Operation: "{0}"'.format( operation ) )
+
+      field = model._django_query_filter( field )
+      if field is None:
+        raise ValueError( 'Invalid Filter Field "{0}"'.format( field ) )
+
+      kwargs = { '{0}__{1}'.format( field, operation ): filter_spec_map[ 'value' ] }
+      return Q( **kwargs )
+
+    if operation is not None:
+      right = filter_spec_map.get( 'right', None )
+      left = filter_spec_map.get( 'left', None )
+      if operation == 'not' and right is not None:
+        return ~Q( self._filter( right, model ) )
+
+      if operation == 'or' and left is not None and right is not None:
+        return Q( self._filter( left, model ) ) | Q( self._filter( right, model ) )
+
+      if operation == 'and' and left is not None and right is not None:
+        return Q( self._filter( left, model ) ) & Q( self._filter( right, model ) )
+
+    raise ValueError( 'Invalid Filter Spec' )
 
   def delete( self, model, object_id ):
     try:
