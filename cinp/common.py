@@ -110,6 +110,7 @@ class URI():
     ( namespace_list, model, action, _, _ ) = self.split( uri_list[0] )
     return self.build( namespace_list, model, action, id_list, True )
 
+
 # barrowed from https://www.python.org/dev/peps/pep-0257/
 def doccstring_prep( docstring ):
   if not docstring:
