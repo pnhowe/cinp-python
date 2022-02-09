@@ -9,7 +9,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError, AppRegis
 from django.db.models import fields, ProtectedError
 from django.core.files import File
 
-from cinp.server_common import Converter, Namespace, Model, Action, Paramater, Field, InvalidRequest, ServerError, checkAuth_true, checkAuth_false, MAP_TYPE_CONVERTER
+from cinp.server_common import Converter, Namespace, Model, Action, Paramater, FilterParamater, Field, InvalidRequest, ServerError, checkAuth_true, checkAuth_false, MAP_TYPE_CONVERTER
 
 __MODEL_REGISTRY__ = {}
 
@@ -143,7 +143,7 @@ def paramater_type_to_paramater( paramater_type, extra=None ):
   if extra is not None:
     result.update( extra )
 
-  return Paramater( **result )
+  return result
 
 
 class DjangoConverter( Converter ):
@@ -442,9 +442,9 @@ class DjangoCInP():
         if index >= default_offset:
           extra[ 'default' ] = default_list[ index - default_offset ]
 
-        paramater_list.append( paramater_type_to_paramater( paramater_type_list_[ index ], extra ) )
+        paramater_list.append( Paramater( **paramater_type_to_paramater( paramater_type_list_[ index ], extra ) ) )
 
-      return_paramater = paramater_type_to_paramater( return_type )
+      return_paramater = Paramater( **paramater_type_to_paramater( return_type ) )
 
       try:
         doc = func.__doc__.strip()
@@ -512,7 +512,7 @@ class DjangoCInP():
 
       paramater_map = {}
       for index in range( 0, len( paramater_type_list_ ) ):
-        paramater = paramater_type_to_paramater( paramater_type_list_[ index ], { 'name': paramater_name_list[ index ] } )
+        paramater = Paramater( **paramater_type_to_paramater( paramater_type_list_[ index ], { 'name': paramater_name_list[ index ] } ) )
         paramater_map[ paramater.name ] = paramater
 
       self.list_filter_map[ model_name ][ name ] = ( func.__func__, paramater_map )
@@ -528,7 +528,9 @@ class DjangoCInP():
 
       filter_map = {}
       for filter in field_list:
-        filter_map[ filter[ 'name' ] ] = paramater_type_to_paramater( filter, { 'name': filter[ 'name' ] } )
+        parm_parms = paramater_type_to_paramater( filter, { 'name': filter[ 'name' ] } )
+        parm_parms = filter.get( 'allowed_operations', None )
+        filter_map[ filter[ 'name' ] ] = FilterParamater( **parm_parms )
 
       model_name_parts = func.__func__.__qualname__.split( '.' )
       self.list_query_filter_map[ '.'.join( model_name_parts[ :-1 ] ) ] = ( func.__func__, filter_map )
@@ -617,9 +619,19 @@ class DjangoTransaction():  # NOTE: developed on Postgres
       q_filter = self._filter( filter_values[ 'filter' ], model )
       qs = model._django_model.objects.filter( q_filter )
       if filter_values[ 'sort' ]:
-        sort_list = [ model._django_query_sort( i ) for i in filter_values[ 'sort' ] ]
-        if None in sort_list:
-          raise ValueError( 'Invalid Sort Field' )
+        sort_list = []
+        for entry in filter_values[ 'sort' ]:
+          if entry[0] == '~':
+            entry = model._django_query_sort( entry[ 1: ]  )
+            if entry is None:
+              raise ValueError( 'Invalid Sort Field' )
+            sort_list.append( '-' + entry )
+
+          else:
+            entry = model._django_query_sort( entry )
+            if entry is None:
+              raise ValueError( 'Invalid Sort Field' )
+            sort_list.append( entry )
 
         qs = qs.order_by( *sort_list )
 
@@ -646,15 +658,15 @@ class DjangoTransaction():  # NOTE: developed on Postgres
     field = filter_spec_map.get( 'field', None )
     if field is not None:
       try:
-        operation = { '=': 'exact', '<': 'lt', '>': 'gt', '<=': 'lte', '>=': 'gte' }[ operation ]
+        operation = { '=': 'exact', '!=': 'neq', '<': 'lt', '>': 'gt', '<=': 'lte', '>=': 'gte', 'startswith': 'startswith', 'endswith': 'endswith', 'contains': 'contains' }[ operation ]
       except KeyError:
         raise ValueError( 'Invalid Filter Operation: "{0}"'.format( operation ) )
 
-      field = model._django_query_filter( field )
-      if field is None:
+      native_field = model._django_query_filter( field )
+      if native_field is None:
         raise ValueError( 'Invalid Filter Field "{0}"'.format( field ) )
 
-      kwargs = { '{0}__{1}'.format( field, operation ): filter_spec_map[ 'value' ] }
+      kwargs = { '{0}__{1}'.format( native_field, operation ): filter_spec_map[ 'value' ] }
       return Q( **kwargs )
 
     if operation is not None:

@@ -11,9 +11,11 @@ class NoCINP( Exception ):
 
 
 class WerkzeugServer( Server ):
-  def __init__( self, get_user, *args, **kwargs ):
+  def __init__( self, get_user=None, auth_header_list=None, auth_cookie_list=None, *args, **kwargs ):
     super().__init__( *args, **kwargs )
     self.getUser = get_user
+    self.auth_header_list = auth_header_list or []
+    self.auth_cookie_list = auth_cookie_list or []
 
   def handle( self, envrionment ):
     try:
@@ -75,7 +77,7 @@ class WerkzeugRequest( Request ):
     # ie: the  "/api" of: WSGIScriptAlias /api <path to wsgi script>
     uri = werkzeug_request.script_root + werkzeug_request.path
 
-    super().__init__( verb=werkzeug_request.method.upper(), uri=uri, header_map=header_map, *args, **kwargs )
+    super().__init__( verb=werkzeug_request.method.upper(), uri=uri, header_map=header_map, cookie_map=werkzeug_request.cookies, *args, **kwargs )
 
     content_type = self.header_map.get( 'CONTENT-TYPE', None )
     if content_type is not None:  # if it is none, there isn't (or shoudn't) be anthing to bring in anyway

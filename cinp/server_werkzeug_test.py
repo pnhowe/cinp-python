@@ -43,7 +43,7 @@ def test_werkzeug_request():
   req = WerkzeugRequest( env )
   assert req.verb == 'GET'
   assert req.uri == '/api/'
-  assert req.header_map == {}
+  assert req.header_map == { 'ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'ACCEPT-ENCODING': 'gzip, deflate', 'CONNECTION': 'keep-alive', 'HOST': '127.0.0.1:8888', 'USER-AGENT': 'Mozilla/5.0' }
   assert req.data is None  # no content type the wsgi.input should be ignored
 
   env = {
@@ -74,7 +74,7 @@ def test_werkzeug_request():
   req = WerkzeugRequest( env )
   assert req.verb == 'DELETE'
   assert req.uri == '/api/ns/model:key:'
-  assert req.header_map == { 'CINP-VERSION': '1.0', 'CONTENT-TYPE': 'application/json;charset=utf-8', 'FILTER': 'curent', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'kd8dkv&TTIv893ink', 'POSITION': '50', 'COUNT': '34', 'MULTI-OBJECT': 'True' }
+  assert req.header_map == { 'CINP-VERSION': '1.0', 'CONTENT-TYPE': 'application/json;charset=utf-8', 'FILTER': 'curent', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'kd8dkv&TTIv893ink', 'POSITION': '50', 'COUNT': '34', 'MULTI-OBJECT': 'True', 'ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'ACCEPT-ENCODING': 'gzip, deflate', 'CONNECTION': 'keep-alive', 'HOST': '127.0.0.1:8888', 'USER-AGENT': 'Mozilla/5.0' }
   assert req.data == { 'this': 'works' }
 
 

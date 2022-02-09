@@ -2,6 +2,7 @@ import traceback
 import json
 import copy
 import sys
+from http import cookies
 from dateutil import parser as datetimeparser
 from urllib import parse
 
@@ -12,6 +13,7 @@ __CINP_VERSION__ = '1.0'
 __MULTI_URI_MAX__ = 100
 
 FIELD_TYPE_LIST = ( 'String', 'Integer', 'Float', 'Boolean', 'DateTime', 'Map', 'Model', 'File' )
+FILTER_OPERATION_LIST = ( '=', '!=', '<', '>', '<=', '>=', 'startswith', 'endswith', 'contains' )  # I wonder how much work it would be to do "in", also "null" and "notnull" and/or blank?
 
 
 class Notset:
@@ -451,6 +453,24 @@ class Field( Paramater ):
     return result
 
 
+class FilterParamater( Paramater ):
+  def __init__( self, allowed_operations=None, *args, **kwargs ):
+    if allowed_operations is not None and set( allowed_operations ) - set( FILTER_OPERATION_LIST ):
+      raise ValueError( 'Mode must a set of "{0}"'.format( FILTER_OPERATION_LIST ) )
+
+    super().__init__( *args, **kwargs )
+    self.allowed_operations = allowed_operations
+
+  def describe( self, converter ):
+    result = super().describe( converter )
+    if self.allowed_operations is not None:
+      result[ 'allowed_operations' ] = self.allowed_operations
+    else:
+      result[ 'allowed_operations' ] = FILTER_OPERATION_LIST
+
+    return result
+
+
 class Element():
   def __init__( self, name, doc='' ):
     if name is None:
@@ -734,9 +754,10 @@ class Model( Element ):
           if not isinstance( entry, str ):
             raise InvalidRequest( data={ 'sort': 'All Sort Fields must be a string' } )
 
-        invalid_sort_list = list( set( sort_list ) - set( self.list_query_sort_list ) )
-        if invalid_sort_list:
-          raise InvalidRequest( data={ 'sort': 'Invalid Filter Sort Field(s): "{0}"'.format( ', '.join( invalid_sort_list ) ) } )
+          sort_reversed = len( entry ) > 2 and entry[0] == '~'
+
+          if ( sort_reversed or entry not in self.list_query_sort_list ) and ( not sort_reversed or entry[ 1: ] not in self.list_query_sort_list ):
+            raise InvalidRequest( data={ 'sort': 'Invalid Filter Sort Field: "{0}"'.format( entry ) } )
 
         filter_values = { 'filter': filter_values, 'sort': sort_list }
 
@@ -766,7 +787,7 @@ class Model( Element ):
       else:
         raise InvalidRequest( e )
 
-    if not isinstance( result, tuple ) and len( result ) != 3:
+    if result is None or ( not isinstance( result, tuple ) and len( result ) != 3 ):
       raise ServerError( 'List result is not a valid tuple' )
 
     ( id_list, position, total ) = result
@@ -781,11 +802,21 @@ class Model( Element ):
     if not filter_spec_map:
       return {}, []
 
+    if not isinstance( filter_spec_map, dict ):
+      raise ValueError( 'Filter Spec must be a dict/map' )
+
     operation = filter_spec_map.get( 'operation', None )
     field = filter_spec_map.get( 'field', None )
     if field is not None:
       if field not in self.list_query_filter_map.keys():
         return {}, [ 'Invalid Filter Field: "{0}"'.format( field ) ]
+
+      if operation not in FILTER_OPERATION_LIST:
+        return {}, [ 'Invalid Filter Operation: "{0}"'.format( operation ) ]
+
+      allowed_operation_list = paramater_map[ field ].allowed_operations
+      if allowed_operation_list is not None and operation not in allowed_operation_list:
+        return {}, [ 'Not Allowed Filter Operation: "{0}"'.format( operation ) ]
 
       try:
         value = filter_spec_map[ 'value' ]
@@ -796,9 +827,6 @@ class Model( Element ):
         value = converter.toPython( paramater_map[ field ], value, transaction )
       except ValueError as e:
         return {}, [ 'Invalid Value "{0}" for field "{1}"'.format( e, field ) ]
-
-      if operation not in ( '=', '<', '>', '<=', '>=' ):
-        return {}, [ 'Invalid Filter Operation: "{0}"'.format( operation ) ]
 
       return { 'field': field, 'value': value, 'operation': operation }, []
 
@@ -1084,9 +1112,11 @@ class Server():
     self.root_namespace.checkAuth = checkAuth_true
     self.cors_allow_list = cors_allow_list
     self.path_handlers = {}
+    self.auth_header_list = []
+    self.auth_cookie_list = []
 
-  def getUser( self, auth_id, auth_token ):
-    if auth_id is not None and auth_token is not None:
+  def getUser( self, cookie_map, header_map ):
+    if cookie_map or header_map:
       raise ValueError( 'getUser not implemented' )
 
     else:
@@ -1213,7 +1243,7 @@ class Server():
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
     if self.cors_allow_list is not None:
       response.header_map[ 'Access-Control-Allow-Origin' ] = ', '.join( self.cors_allow_list )
-      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id, Id-Only'  # TODO: probably should only list the ones actually sent
+      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id, Id-Only'  # TODO: probably should only list the ones actually sent, also add auth headers and cookie?
 
     return response
 
@@ -1281,10 +1311,10 @@ class Server():
       elif multi:
         raise InvalidRequest( 'requested non multi-object, however multiple ids where sent' )
 
-    auth_id = request.header_map.get( 'AUTH-ID', None )
-    auth_token = request.header_map.get( 'AUTH-TOKEN', None )
+    header_map = dict( [ ( i, request.header_map.get( i, None ) ) for i in self.auth_header_list ] )
+    cookie_map = dict( [ ( i, request.cookie_map.get( i, None ) ) for i in self.auth_cookie_list ] )
 
-    user = self.getUser( auth_id, auth_token )
+    user = self.getUser( cookie_map, header_map )
     if user is None:
       return Response( 401, data={ 'message': 'Invalid Session' } )
 
@@ -1373,15 +1403,12 @@ class Server():
 
 
 class Request():
-  def __init__( self, verb, uri, header_map ):
+  def __init__( self, verb, uri, header_map, cookie_map ):
     super().__init__()
     self.verb = verb
     self.uri = uri  # make sure the query string/fragment/etc has allreay been stripped by the Child Class
-    self.header_map = {}
-    for name in header_map:
-      if name in ( 'CINP-VERSION', 'AUTH-ID', 'AUTH-TOKEN', 'CONTENT-TYPE', 'FILTER', 'POSITION', 'COUNT', 'MULTI-OBJECT', 'ID-ONLY' ):
-        self.header_map[ name ] = header_map[ name ]
-
+    self.header_map = header_map
+    self.cookie_map = cookie_map
     self.data = None
 
   def fromText( self, buff ):
@@ -1415,6 +1442,7 @@ class Response():
     self.http_code = http_code
     self.data = data
     self.header_map = header_map or {}
+    self.cookies = None
 
   def buildNativeResponse( self ):
     if self.content_type == 'json':
@@ -1437,6 +1465,31 @@ class Response():
 
   def asBytes( self ):
     return None
+
+  def setCookie( self, key, value='', max_age=None, expires=None, path='/', domain=None, secure=False, httponly=False, samesite='Strict' ):
+    if self.cookies is None:
+      self.cookies = cookies.SimpleCookie()
+
+    self.cookies[ key ] = value
+    self.cookies[ key ][ 'path' ] = path
+    self.cookies[ key ][ 'samesite' ] = samesite
+
+    if max_age is not None:
+      self.cookies[ key ][ 'max-age' ] = max_age
+
+    if expires is not None:
+      self.cookies[ key ][ 'expires' ] = expires
+
+    if domain is not None:
+      self.cookies[ key ][ 'domain' ] = domain
+
+    if secure:
+      self.cookies[ key ][ 'secure' ] = True
+
+    if httponly:
+      self.cookies[ key ][ 'httponly' ] = True
+
+    self.header_map[ 'Set-Cookie' ] = self.cookies.OutputString()
 
   def __str__( self ):
     return 'Response:\n  Content Type: "{0}"\n  HTTP Code: "{1}"\n  Header Map: "{2}"\n  Data: "{3}"'.format( self.content_type, self.http_code, self.header_map, self.data )

@@ -1,3 +1,10 @@
+cinp (1.0.1-1) DIST; urgency=medium
+
+  * query filtering limiting operations
+  * updated getUser to take in cookies
+
+ -- Peter Howe <pnhowe@gmail.com>  Tue, 08 Feb 2022 17:13:10 -0700
+
 cinp (1.0.0-1) DIST; urgency=medium
 
   * Version 1.0
