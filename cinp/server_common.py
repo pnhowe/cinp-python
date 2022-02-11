@@ -2,7 +2,6 @@ import traceback
 import json
 import copy
 import sys
-from http import cookies
 from dateutil import parser as datetimeparser
 from urllib import parse
 
@@ -1102,25 +1101,28 @@ class Action( Element ):
     return Response( 200, data=None, header_map=header_map )
 
 
+def defaultGetUser( cookie_map, header_map ):
+  if cookie_map or header_map:
+    raise ValueError( 'get_user not specified' )
+
+  else:
+    return AnonymousUser()
+
+
 class Server():
-  def __init__( self, root_path, root_version, debug=False, cors_allow_list=None, debug_dump_location=None ):
+  def __init__( self, root_path, root_version, get_user=None, auth_header_list=None, auth_cookie_list=None, cors_allow_origin=None, debug=False, debug_dump_location=None ):
     super().__init__()
     self.uri = URI( root_path )
+    self.get_user = get_user or defaultGetUser
+    self.auth_header_list = auth_header_list or []
+    self.auth_cookie_list = auth_cookie_list or []
+    self.cors_allow_origin = cors_allow_origin
     self.debug = debug
     self.debug_dump_location = debug_dump_location
+
     self.root_namespace = Namespace( name=None, version=root_version, root_path=root_path, converter=Converter( self.uri ) )
     self.root_namespace.checkAuth = checkAuth_true
-    self.cors_allow_list = cors_allow_list
     self.path_handlers = {}
-    self.auth_header_list = []
-    self.auth_cookie_list = []
-
-  def getUser( self, cookie_map, header_map ):
-    if cookie_map or header_map:
-      raise ValueError( 'getUser not implemented' )
-
-    else:
-      return AnonymousUser()
 
   def _validateModel( self, model ):
     for field_name in model.field_map:
@@ -1241,9 +1243,9 @@ class Server():
         response = Response( 500, data={ 'message': 'Path Handler Return an Invalid Response: ({0})"{1}"'.format( type( response ).__name__, response ) } )
 
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
-    if self.cors_allow_list is not None:
-      response.header_map[ 'Access-Control-Allow-Origin' ] = ', '.join( self.cors_allow_list )
-      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id, Id-Only'  # TODO: probably should only list the ones actually sent, also add auth headers and cookie?
+    if self.cors_allow_origin is not None:
+      response.header_map[ 'Access-Control-Allow-Origin' ] = self.cors_allow_origin
+      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id, Id-Only'  # what is exposed to script in the browser
 
     return response
 
@@ -1267,9 +1269,11 @@ class Server():
 
     if request.verb == 'OPTIONS':  # options never need auth, nor is the Cinp-Version header required, we can take care of it early
       response = element.options()
-      if self.cors_allow_list is not None:
+      if self.cors_allow_origin is not None:  # these are "preflight request" check headers
         response.header_map[ 'Access-Control-Allow-Methods' ] = response.header_map[ 'Allow' ]
-        response.header_map[ 'Access-Control-Allow-Headers' ] = 'Accept, Cinp-Version, Auth-Id, Auth-Token, Filter, Content-Type, Count, Position, Multi-Object, Id-Only'
+        response.header_map[ 'Access-Control-Allow-Headers' ] = 'Accept, Cinp-Version, Filter, Content-Type, Count, Position, Multi-Object, Id-Only' + ', '.join( self.auth_header_list )  # in a perfect world we would take the request 'Access-Control-Request-Headers' and take a union with this list, but we will leave that to the browser
+        if len( self.auth_cookie_list ) > 0:
+          response.header_map[ 'Access-Control-Allow-Credentials' ] = 'true'
 
       return response
 
@@ -1314,7 +1318,7 @@ class Server():
     header_map = dict( [ ( i, request.header_map.get( i, None ) ) for i in self.auth_header_list ] )
     cookie_map = dict( [ ( i, request.cookie_map.get( i, None ) ) for i in self.auth_cookie_list ] )
 
-    user = self.getUser( cookie_map, header_map )
+    user = self.get_user( cookie_map, header_map )
     if user is None:
       return Response( 401, data={ 'message': 'Invalid Session' } )
 
@@ -1428,8 +1432,8 @@ class Request():
   def fromXML( self, buff ):
     pass
 
-  def fromBytes( self, buff ):
-    pass
+  def fromURLEncodedForm( self, buff ):
+    self.data = parse.parse_qs( buff )
 
   def __str__( self ):
     return 'Request:\n  Verb: "{0}"\n  URI: "{1}"\n  Header Map: "{2}"\n  Data: "{3}"'.format( self.verb, self.uri, self.header_map, self.data )
@@ -1442,7 +1446,7 @@ class Response():
     self.http_code = http_code
     self.data = data
     self.header_map = header_map or {}
-    self.cookies = None
+    self.cookie_list = []
 
   def buildNativeResponse( self ):
     if self.content_type == 'json':
@@ -1466,30 +1470,11 @@ class Response():
   def asBytes( self ):
     return None
 
-  def setCookie( self, key, value='', max_age=None, expires=None, path='/', domain=None, secure=False, httponly=False, samesite='Strict' ):
-    if self.cookies is None:
-      self.cookies = cookies.SimpleCookie()
+  def setCookie( self, key, value='', max_age=None, expires=None, path='/', domain=None, secure=False, httponly=False, samesite=None ):  # these are werkzeug's defaults
+    self.cookie_list.append( ( key, value, max_age, expires, path, domain, secure, httponly, samesite ) )
 
-    self.cookies[ key ] = value
-    self.cookies[ key ][ 'path' ] = path
-    self.cookies[ key ][ 'samesite' ] = samesite
-
-    if max_age is not None:
-      self.cookies[ key ][ 'max-age' ] = max_age
-
-    if expires is not None:
-      self.cookies[ key ][ 'expires' ] = expires
-
-    if domain is not None:
-      self.cookies[ key ][ 'domain' ] = domain
-
-    if secure:
-      self.cookies[ key ][ 'secure' ] = True
-
-    if httponly:
-      self.cookies[ key ][ 'httponly' ] = True
-
-    self.header_map[ 'Set-Cookie' ] = self.cookies.OutputString()
+  def deleteCookie( self, key, path='/', domain=None ):
+    self.setCookie( key, expires=0, max_age=0, path=path, domain=domain )
 
   def __str__( self ):
     return 'Response:\n  Content Type: "{0}"\n  HTTP Code: "{1}"\n  Header Map: "{2}"\n  Data: "{3}"'.format( self.content_type, self.http_code, self.header_map, self.data )

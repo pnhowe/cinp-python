@@ -4,20 +4,20 @@ DISTRO_NAME := $(shell lsb_release -sc | tr A-Z a-z)
 VERSION := $(shell head -n 1 debian-common/changelog | awk '{match( $$0, /\(.+?\)/); print substr( $$0, RSTART+1, RLENGTH-2 ) }' | cut -d- -f1 )
 
 all:
-	./setup.py build
+	python3 -B setup.py build
 
 install:
 ifeq (ubuntu, $(DISTRO))
-	./setup.py install --root=$(DESTDIR) --install-purelib=/usr/lib/python3/dist-packages/ --prefix=/usr --no-compile -O0
+	python3 -B setup.py install --root=$(DESTDIR) --install-purelib=/usr/lib/python3/dist-packages/ --prefix=/usr --no-compile -O0
 else
-	./setup.py install --root=$(DESTDIR) --prefix=/usr --no-compile -O0
+	python3 -B setup.py install --root=$(DESTDIR) --prefix=/usr --no-compile -O0
 endif
 
 version:
 	echo $(VERSION)
 
 clean:
-	./setup.py clean || true
+	python3 -B setup.py clean || true
 	$(RM) -fr build
 	$(RM) -f dpkg
 	$(RM) -f rpm

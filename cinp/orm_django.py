@@ -93,7 +93,7 @@ def property_model_resolver( model_name ):
   return ( None, None, model )
 
 
-def paramater_type_to_paramater( paramater_type, extra=None ):
+def _paramater_type_to_paramater( paramater_type, extra ):
   if paramater_type is None:
     return None
 
@@ -144,6 +144,25 @@ def paramater_type_to_paramater( paramater_type, extra=None ):
     result.update( extra )
 
   return result
+
+
+def paramater_type_to_paramater( paramater_type, extra=None ):
+  kwargs = _paramater_type_to_paramater( paramater_type, extra )
+  if kwargs is None:
+    return None
+
+  return Paramater( **kwargs )
+
+
+def paramater_type_to_filter_paramater( paramater_type ):
+  kwargs = _paramater_type_to_paramater( paramater_type, None )
+  if kwargs is None:
+    return None
+
+  kwargs[ 'name' ] = paramater_type[ 'name' ]
+  kwargs[ 'allowed_operations' ] = paramater_type.get( 'allowed_operations', None )
+
+  return FilterParamater( **kwargs )
 
 
 class DjangoConverter( Converter ):
@@ -442,9 +461,9 @@ class DjangoCInP():
         if index >= default_offset:
           extra[ 'default' ] = default_list[ index - default_offset ]
 
-        paramater_list.append( Paramater( **paramater_type_to_paramater( paramater_type_list_[ index ], extra ) ) )
+        paramater_list.append( paramater_type_to_paramater( paramater_type_list_[ index ], extra ) )
 
-      return_paramater = Paramater( **paramater_type_to_paramater( return_type ) )
+      return_paramater = paramater_type_to_paramater( return_type )
 
       try:
         doc = func.__doc__.strip()
@@ -512,7 +531,7 @@ class DjangoCInP():
 
       paramater_map = {}
       for index in range( 0, len( paramater_type_list_ ) ):
-        paramater = Paramater( **paramater_type_to_paramater( paramater_type_list_[ index ], { 'name': paramater_name_list[ index ] } ) )
+        paramater = paramater_type_to_paramater( paramater_type_list_[ index ], { 'name': paramater_name_list[ index ] } )
         paramater_map[ paramater.name ] = paramater
 
       self.list_filter_map[ model_name ][ name ] = ( func.__func__, paramater_map )
@@ -528,9 +547,7 @@ class DjangoCInP():
 
       filter_map = {}
       for filter in field_list:
-        parm_parms = paramater_type_to_paramater( filter, { 'name': filter[ 'name' ] } )
-        parm_parms = filter.get( 'allowed_operations', None )
-        filter_map[ filter[ 'name' ] ] = FilterParamater( **parm_parms )
+        filter_map[ filter[ 'name' ] ] = paramater_type_to_filter_paramater( filter )
 
       model_name_parts = func.__func__.__qualname__.split( '.' )
       self.list_query_filter_map[ '.'.join( model_name_parts[ :-1 ] ) ] = ( func.__func__, filter_map )

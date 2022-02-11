@@ -959,8 +959,7 @@ def test_not_allowed_verbs():
 
 
 def test_user():
-  server = Server( root_path='/api/', root_version='0.0', debug=True )
-  server.getUser = getUser
+  server = Server( root_path='/api/', root_version='0.0', debug=True, get_user=getUser )
   server.auth_header_list = [ 'HID', 'TOKEN' ]
   server.auth_cookie_list = [ 'CID', 'TOKEN' ]
   ns1 = Namespace( name='ns1', version='0.1', converter=None )
