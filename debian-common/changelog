@@ -1,4 +1,4 @@
-cinp (1.1.0-1) DIST; urgency=medium
+cinp (1.1.1-1) DIST; urgency=medium
 
   * Bug fixes
   * Getting cookies to work with CORS

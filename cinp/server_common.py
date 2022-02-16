@@ -1246,6 +1246,8 @@ class Server():
     if self.cors_allow_origin is not None:
       response.header_map[ 'Access-Control-Allow-Origin' ] = self.cors_allow_origin
       response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id, Id-Only'  # what is exposed to script in the browser
+      if len( self.auth_cookie_list ) > 0:
+        response.header_map[ 'Access-Control-Allow-Credentials' ] = 'true'
 
     return response
 
@@ -1272,8 +1274,6 @@ class Server():
       if self.cors_allow_origin is not None:  # these are "preflight request" check headers
         response.header_map[ 'Access-Control-Allow-Methods' ] = response.header_map[ 'Allow' ]
         response.header_map[ 'Access-Control-Allow-Headers' ] = 'Accept, Cinp-Version, Filter, Content-Type, Count, Position, Multi-Object, Id-Only' + ', '.join( self.auth_header_list )  # in a perfect world we would take the request 'Access-Control-Request-Headers' and take a union with this list, but we will leave that to the browser
-        if len( self.auth_cookie_list ) > 0:
-          response.header_map[ 'Access-Control-Allow-Credentials' ] = 'true'
 
       return response
 
