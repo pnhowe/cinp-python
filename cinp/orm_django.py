@@ -488,8 +488,8 @@ class DjangoCInP():
     return decorator
 
   @staticmethod
-  def basic_auth_check( user, verb, model ):
-    if verb in ( 'CALL', 'DESCRIBE' ):
+  def basic_auth_check( user, verb, model, action, action_permission_map=None ):
+    if verb == 'DESCRIBE':
       return True
 
     app = model._meta.app_label
@@ -510,6 +510,15 @@ class DjangoCInP():
 
     if verb == 'DELETE' and user.has_perm( '{0}.delete_{1}'.format( app, model ) ):
       return True
+
+    if verb == 'CALL':
+      if not action_permission_map:
+        return False
+
+      try:
+        return user.has_perm( action_permission_map[ action ] )
+      except KeyError:
+        return False
 
     return False
 
