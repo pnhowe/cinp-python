@@ -488,7 +488,7 @@ class DjangoCInP():
     return decorator
 
   @staticmethod
-  def basic_auth_check( user, verb, model, action, action_permission_map=None ):
+  def basic_auth_check( user, verb, action, model, action_permission_map=None ):
     if verb == 'DESCRIBE':
       return True
 
