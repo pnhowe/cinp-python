@@ -2,8 +2,23 @@ import pytest
 
 from django.db import models
 
-from cinp.orm_django import DjangoCInP
+from cinp.orm_django import DjangoCInP, HAS_VIEW_PERMISSION
 from cinp.server_common import Server, Request
+
+last_permission = None
+permission_result = False
+
+
+class testAuthUser():
+  def has_perm( self, permission ):
+    global last_permission
+    last_permission = permission
+    return permission_result
+
+
+class testAuthModel():
+  def __init__( self, label, name ):
+    self._meta = type( '_meta', (), { 'app_label': label, 'model_name': name } )
 
 #  The checkAuth lambda/eval mess has a way of trying to use the last checkAuth in
 #  for everything (or everything in that model.py), make sure there is a test to guard
@@ -629,3 +644,93 @@ def test_multi_through_model_manytomany():
                       'query-sort-fields': []
                     }
   assert r.http_code == 200
+
+
+def test_basic_auth_check():
+  global last_permission, permission_result
+
+  model = testAuthModel( 'tlabel', 'tmodel' )
+  user = testAuthUser()
+
+  last_permission = None
+  permission_result = False
+  assert DjangoCInP.basic_auth_check( user, 'DESCRIBE', None, model ) is True
+  assert last_permission is None
+
+  last_permission = None
+  permission_result = True
+  assert DjangoCInP.basic_auth_check( user, 'BOB', None, model ) is False
+  assert last_permission is None
+
+  last_permission = None
+  permission_result = False
+  assert DjangoCInP.basic_auth_check( user, 'DESCRIBE', None, model ) is True
+  assert last_permission is None
+
+  last_permission = None
+  permission_result = True
+  assert DjangoCInP.basic_auth_check( user, 'GET', None, model ) is True
+  if HAS_VIEW_PERMISSION:
+    assert last_permission == 'tlabel.view_tmodel'
+    permission_result = False
+    assert DjangoCInP.basic_auth_check( user, 'GET', None, model ) is False
+
+    last_permission = None
+    permission_result = False
+    assert DjangoCInP.basic_auth_check( user, 'CREATE', None, model ) is False
+    assert last_permission == 'tlabel.add_tmodel'
+
+    last_permission = None
+    permission_result = True
+    assert DjangoCInP.basic_auth_check( user, 'DELETE', None, model ) is True
+    assert last_permission == 'tlabel.delete_tmodel'
+
+    last_permission = None
+    permission_result = False
+    assert DjangoCInP.basic_auth_check( user, 'UPDATE', None, model ) is False
+    assert last_permission == 'tlabel.change_tmodel'
+
+    last_permission = None
+    permission_result = True
+    assert DjangoCInP.basic_auth_check( user, 'CALL', None, model ) is False
+    assert last_permission is None
+
+    last_permission = None
+    permission_result = True
+    assert DjangoCInP.basic_auth_check( user, 'CALL', 'please', model ) is False
+    assert last_permission is None
+
+    last_permission = None
+    permission_result = True
+    assert DjangoCInP.basic_auth_check( user, 'CALL', 'please', model, {} ) is False
+    assert last_permission is None
+
+    last_permission = None
+    permission_result = True
+    assert DjangoCInP.basic_auth_check( user, 'CALL', 'please', model, { 'permission': 'ha ha ha' } ) is False
+    assert last_permission is None
+
+    last_permission = None
+    permission_result = False
+    assert DjangoCInP.basic_auth_check( user, 'CALL', 'please', model, { 'please': None } ) is True
+    assert last_permission is None
+
+    last_permission = None
+    permission_result = False
+    assert DjangoCInP.basic_auth_check( user, 'CALL', 'please', model, { 'please': 'mayi' } ) is False
+    assert last_permission == 'mayi'
+
+    last_permission = None
+    permission_result = True
+    assert DjangoCInP.basic_auth_check( user, 'CALL', 'please', model, { 'please': 'mayi' } ) is True
+    assert last_permission == 'mayi'
+
+    last_permission = None
+    permission_result = True
+    assert DjangoCInP.basic_auth_check( user, 'CALL', 'please', model, { 'please': [ 'mayi', 'mabeynot' ] } ) is True
+    assert last_permission == 'mayi'
+
+    last_permission = None
+    permission_result = False
+    assert DjangoCInP.basic_auth_check( user, 'CALL', 'please', model, { 'please': [ 'mayi', 'mabeynot' ] } ) is False
+    assert last_permission == 'mabeynot'

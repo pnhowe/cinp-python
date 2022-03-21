@@ -1,4 +1,4 @@
-cinp (1.2.1-1) DIST; urgency=medium
+cinp (1.2.2-1) DIST; urgency=medium
 
   * django - basic_auth_check now dosen't default to allow for CALL
 

@@ -497,28 +497,39 @@ class DjangoCInP():
 
     if verb in ( 'GET', 'LIST' ):
       if HAS_VIEW_PERMISSION:
-        if user.has_perm( '{0}.view_{1}'.format( app, model ) ):
-          return True
+        return user.has_perm( '{0}.view_{1}'.format( app, model ) )
       else:
         return True
 
-    if verb == 'CREATE' and user.has_perm( '{0}.add_{1}'.format( app, model ) ):
-      return True
+    if verb == 'CREATE':
+      return user.has_perm( '{0}.add_{1}'.format( app, model ) )
 
-    if verb == 'UPDATE' and user.has_perm( '{0}.change_{1}'.format( app, model ) ):
-      return True
+    if verb == 'UPDATE':
+      return user.has_perm( '{0}.change_{1}'.format( app, model ) )
 
-    if verb == 'DELETE' and user.has_perm( '{0}.delete_{1}'.format( app, model ) ):
-      return True
+    if verb == 'DELETE':
+      return user.has_perm( '{0}.delete_{1}'.format( app, model ) )
 
     if verb == 'CALL':
       if not action_permission_map:
         return False
 
       try:
-        return user.has_perm( action_permission_map[ action ] )
+        permissions = action_permission_map[ action ]
       except KeyError:
         return False
+
+      if permissions is None:
+        return True
+
+      if isinstance( permissions, ( list, tuple ) ):
+        for permission in permissions:
+          if user.has_perm( permission ):
+            return True
+
+        return False
+      else:
+        return user.has_perm( permissions )
 
     return False
 
