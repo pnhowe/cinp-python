@@ -1,3 +1,9 @@
+cinp (1.2.3-1) DIST; urgency=medium
+
+  * moved list query sort descending logic to query_sort function
+
+ -- Peter Howe <pnhowe@gmail.com>  Tue, 03 May 2022 11:06:46 -0600
+
 cinp (1.2.2-1) DIST; urgency=medium
 
   * django - basic_auth_check now dosen't default to allow for CALL
