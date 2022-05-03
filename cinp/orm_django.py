@@ -517,7 +517,10 @@ class DjangoCInP():
       try:
         permissions = action_permission_map[ action ]
       except KeyError:
-        return False
+        try:
+          permissions = action_permission_map[ '*' ]
+        except KeyError:
+          return False
 
       if permissions is None:
         return True
@@ -658,17 +661,14 @@ class DjangoTransaction():  # NOTE: developed on Postgres
       if filter_values[ 'sort' ]:
         sort_list = []
         for entry in filter_values[ 'sort' ]:
-          if entry[0] == '~':
-            entry = model._django_query_sort( entry[ 1: ]  )
-            if entry is None:
-              raise ValueError( 'Invalid Sort Field' )
-            sort_list.append( '-' + entry )
+          desc = entry[0] == '~'
+          if desc:
+            entry = entry[ 1: ]
 
-          else:
-            entry = model._django_query_sort( entry )
-            if entry is None:
-              raise ValueError( 'Invalid Sort Field' )
-            sort_list.append( entry )
+          entry = model._django_query_sort( entry, desc )
+          if entry is None:
+            raise ValueError( 'Invalid Sort Field' )
+          sort_list.append( entry )
 
         qs = qs.order_by( *sort_list )
 
