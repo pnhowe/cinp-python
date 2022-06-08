@@ -699,12 +699,17 @@ class DjangoTransaction():  # NOTE: developed on Postgres
       except KeyError:
         raise ValueError( 'Invalid Filter Operation: "{0}"'.format( operation ) )
 
-      native_field = model._django_query_filter( field )
-      if native_field is None:
+      filter_query = model._django_query_filter( field, operation, filter_spec_map[ 'value' ] )
+      if filter_query is None:
         raise ValueError( 'Invalid Filter Field "{0}"'.format( field ) )
 
-      kwargs = { '{0}__{1}'.format( native_field, operation ): filter_spec_map[ 'value' ] }
-      return Q( **kwargs )
+      if isinstance( filter_query, Q ):
+        return filter_query
+
+      if not isinstance( filter_query, dict ):
+        raise Exception( 'filter_query is not a dict' )
+
+      return Q( **filter_query )
 
     if operation is not None:
       right = filter_spec_map.get( 'right', None )
