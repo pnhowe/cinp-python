@@ -11,9 +11,8 @@ class NoCINP( Exception ):
 
 
 class WerkzeugServer( Server ):
-  def __init__( self, get_user, *args, **kwargs ):
+  def __init__( self, *args, **kwargs ):
     super().__init__( *args, **kwargs )
-    self.getUser = get_user
 
   def handle( self, envrionment ):
     try:
@@ -75,7 +74,7 @@ class WerkzeugRequest( Request ):
     # ie: the  "/api" of: WSGIScriptAlias /api <path to wsgi script>
     uri = werkzeug_request.script_root + werkzeug_request.path
 
-    super().__init__( verb=werkzeug_request.method.upper(), uri=uri, header_map=header_map, *args, **kwargs )
+    super().__init__( verb=werkzeug_request.method.upper(), uri=uri, header_map=header_map, cookie_map=werkzeug_request.cookies, *args, **kwargs )
 
     content_type = self.header_map.get( 'CONTENT-TYPE', None )
     if content_type is not None:  # if it is none, there isn't (or shoudn't) be anthing to bring in anyway
@@ -94,6 +93,9 @@ class WerkzeugRequest( Request ):
           self.header_map[ 'CONTENT-DISPOSITION' ] = header_map[ 'CONTENT-DISPOSITION' ]
         pass  # do nothing, down stream is going to have to read from the stream
 
+      elif content_type.startswith( 'application/x-www-form-urlencoded' ):
+        self.fromURLEncodedForm( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) )  # TODO: re-evulate to see if all these need to be converted to string first, newer versions of python might handle them right
+
       else:
         raise InvalidRequest( message='Unknown Content-Type "{0}"'.format( content_type ) )
 
@@ -101,7 +103,9 @@ class WerkzeugRequest( Request ):
       self.remote_addr = header_map[ 'X-FORWARDED-FOR' ]
     else:
       self.remote_addr = werkzeug_request.remote_addr
+
     self.is_secure = werkzeug_request.is_secure
+
     werkzeug_request.close()
 
   def read( self, size ):
@@ -121,6 +125,9 @@ class WerkzeugResponse():  # TODO: this should be a subclass of the server_commo
     for name in response.header_map:
       self.header_list.append( ( name, response.header_map[ name ] ) )
 
+    for ( key, value, max_age, expires, path, domain, secure, httponly, samesite ) in response.cookie_list:
+      self.header_list.append( ( 'Set-Cookie', werkzeug.http.dump_cookie( key, value=value, max_age=max_age, expires=expires, path=path, domain=domain, secure=secure, httponly=httponly, samesite=samesite ) ) )
+
   def buildNativeResponse( self ):
     if self.content_type == 'json':
       return self.asJSON()
@@ -132,7 +139,17 @@ class WerkzeugResponse():  # TODO: this should be a subclass of the server_commo
     return self.asText()
 
   def asText( self ):
-    return werkzeug.wrappers.BaseResponse( response=self.data.encode( 'utf-8' ), status=self.status, headers=self.header_list, content_type='text/plain;charset=utf-8' )
+    if self.data is None:
+      response = ''.encode( 'utf-8' )
+    else:
+      response = self.data.encode( 'utf-8' )
+
+    if self.content_type == 'text':
+      content_type = 'text/plain;charset=utf-8'
+    else:
+      content_type = self.content_type + ';charset=utf-8'
+
+    return werkzeug.wrappers.BaseResponse( response=response, status=self.status, headers=self.header_list, content_type=content_type )
 
   def asJSON( self ):
     if self.data is None:
@@ -146,4 +163,9 @@ class WerkzeugResponse():  # TODO: this should be a subclass of the server_commo
     return werkzeug.wrappers.BaseResponse( response='<xml>Not Implemented</xml>', status=self.response.http_code, headers=self.header_list, content_type='application/xml;charset=utf-8' )
 
   def asBytes( self ):
-    return werkzeug.wrappers.BaseResponse( response=self.data, status=self.status, headers=self.header_list, content_type='application/octet-stream'  )
+    if self.data is None:
+      response = ''
+    else:
+      response = self.data
+
+    return werkzeug.wrappers.BaseResponse( response=response, status=self.status, headers=self.header_list, content_type='application/octet-stream'  )

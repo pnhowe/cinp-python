@@ -1,4 +1,4 @@
-This is a demo/reference client/server implementation, it uses Django's ORM and werkzurg/gunicorn for 
+This is a demo/reference client/server implementation, it uses Django's ORM and werkzurg/gunicorn for
 WSGI.  You will need django installed version 1.8 or better.
 
 This demo is not complete, and is added to from time.  And  by no means should you use it to run
@@ -36,11 +36,11 @@ the client tends to leave things behind in the demo db, you may have to remove a
 the demo again. first ctl-c and stop the ./run_server then::
 
   rm db.sqlite3 ; ./manage.py migrate --noinput
-  ./run_Server.py
+  ./run_server.py
 
-If you are fimilure with django, you can run the migrate without the --noinput and start the django builtin 
+If you are fimilure with django, you can run the migrate without the --noinput and start the django builtin
 server, and get to the database admin pages
 
-you can tcpdump port port 8888 to  see what the request/responses look like over the wire. Utilities 
+you can tcpdump port port 8888 to  see what the request/responses look like over the wire. Utilities
 such as RESTClient for Firefox and Advanced Rest Client for Chrome can also be used.  Make sure
-to set the 'CInP-Version: 0.9' header.
+to set the 'CInP-Version: 1.0' header.

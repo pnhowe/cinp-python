@@ -168,9 +168,34 @@ def test_extract_ids():
     uri.extractIds( id_list )
 
   id_list = [ '/api/v1/ns/model' ]
-  with pytest.raises( ValueError ):
-    uri.extractIds( id_list )
+  uri.extractIds( id_list ) == []
 
   id_list = [ '/api/v1/ns/model:sdf:', '/api/v1/ns/model', '/api/v1/ns/model:rfv:' ]
+  uri.extractIds( id_list ) == [ 'sdf', 'rfv' ]
+
+  assert uri.extractIds( [] ) == []
+
+
+def test_urilist_to_uri():
+  uri = URI( '/api/v1/' )
+
+  id_list = [ '/api/v1/ns/model:sdf:', '/api/v1/ns/model:234:', '/api/v1/ns/model:rfv:' ]
+  assert uri.uriListToMultiURI( id_list ) == '/api/v1/ns/model:sdf:234:rfv:'
+
+  id_list = [ '/api/v1/ns/model:sdf:', '/api/v1/ns/model:234:www:', '/api/v1/ns/model:rfv:' ]
+  assert uri.uriListToMultiURI( id_list ) == '/api/v1/ns/model:sdf:234:www:rfv:'
+
+  id_list = [ '/api/v1/ns/model:234:www:' ]
+  assert uri.uriListToMultiURI( id_list ) == '/api/v1/ns/model:234:www:'
+
+  id_list = [ '/api/v1/ns/model:sdf:', '/api/v1/ns/model:234:www', '/api/v1/ns/model:rfv:' ]
   with pytest.raises( ValueError ):
-    uri.extractIds( id_list )
+    uri.uriListToMultiURI( id_list )
+
+  id_list = [ '/api/v1/ns/model' ]
+  uri.uriListToMultiURI( id_list ) == []
+
+  id_list = [ '/api/v1/ns/model:sdf:', '/api/v1/ns/model', '/api/v1/ns/model:rfv:' ]
+  uri.uriListToMultiURI( id_list ) == '/api/v1/ns/model:sdf:rfv:'
+
+  assert uri.uriListToMultiURI( [] ) == []

@@ -10,7 +10,7 @@ from cinp.readers import READER_REGISTRY
 FILE_STORAGE = '/tmp/django_file_handler/'
 FILE_TTL = timedelta( hours=2 )
 CHUNK_SIZE = 4096 * 1024
-INLINE_CONTENT_DISPOSITION = re.compile( '^inline: filename="([a-zA-Z0-9_\-\. ]+)"$' )
+INLINE_CONTENT_DISPOSITION = re.compile( r'^inline: filename="([a-zA-Z0-9_\-\. ]+)"$' )
 
 
 def cleaner():  # .meta files are created at the same time, so they should clean up at the same time

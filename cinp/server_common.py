@@ -8,10 +8,11 @@ from urllib import parse
 from cinp.common import URI, doccstring_prep
 from cinp.readers import READER_REGISTRY
 
-__CINP_VERSION__ = '0.9'
+__CINP_VERSION__ = '1.0'
 __MULTI_URI_MAX__ = 100
 
 FIELD_TYPE_LIST = ( 'String', 'Integer', 'Float', 'Boolean', 'DateTime', 'Map', 'Model', 'File' )
+FILTER_OPERATION_LIST = ( '=', '!=', '<', '>', '<=', '>=', 'startswith', 'endswith', 'contains' )  # I wonder how much work it would be to do "in", also "null" and "notnull" and/or blank?
 
 
 class Notset:
@@ -22,7 +23,7 @@ class Notset:
 notset = Notset()
 
 
-class InvalidRequest( Exception ):
+class InvalidRequest( Exception ):  # TODO: look for all the catch ValueError that might be a ValueError with data/response_data, there seems to be three ways of dealing with ValueError, needs to be cleaned up
   def __init__( self, message=None, data=None ):
     try:
       self.data = message.response_data
@@ -230,6 +231,9 @@ class Converter():
       if cinp_value is None or cinp_value == '':
         return None
 
+      if not isinstance( cinp_value, str ):
+        raise ValueError( 'Model refrence must be a string uri' )
+
       ( path, model, action, id_list, multi ) = self.uri.split( cinp_value )
 
       if self.uri.build( path, model ) != paramater.model.path:
@@ -350,7 +354,8 @@ class Converter():
 
       result = []
       if paramater.type == 'Model':
-        python_value = list( python_value.all() )  # django specific again, and really should only get the pk
+        if hasattr( python_value, 'all' ):  # ie: is QueryString or a ManyRelatedManager or simaler
+          python_value = list( python_value.all() )  # django specific again, and really should only get the pk
 
       if not isinstance( python_value, list ):
         raise ValueError( 'Must be an Array/List, got "{0}"'.format( type( python_value ).__name__ ) )
@@ -423,7 +428,7 @@ class Paramater():
         result[ 'is_array' ] = True
       if self.default is not notset:
         if callable( self.default ):
-          result[ 'default' ] = '<callable "{0}">'.format( self.default.__name__ )
+          result[ 'default' ] = converter.fromPython( self, self.default() )
         else:
           result[ 'default' ] = converter.fromPython( self, self.default )
 
@@ -443,6 +448,24 @@ class Field( Paramater ):
     result = super().describe( converter )
     result[ 'mode' ] = self.mode
     result[ 'required' ] = self.required
+
+    return result
+
+
+class FilterParamater( Paramater ):
+  def __init__( self, allowed_operations=None, *args, **kwargs ):
+    if allowed_operations is not None and set( allowed_operations ) - set( FILTER_OPERATION_LIST ):
+      raise ValueError( 'Mode must a set of "{0}"'.format( FILTER_OPERATION_LIST ) )
+
+    super().__init__( *args, **kwargs )
+    self.allowed_operations = allowed_operations
+
+  def describe( self, converter ):
+    result = super().describe( converter )
+    if self.allowed_operations is not None:
+      result[ 'allowed_operations' ] = self.allowed_operations
+    else:
+      result[ 'allowed_operations' ] = FILTER_OPERATION_LIST
 
     return result
 
@@ -579,9 +602,10 @@ class Namespace( Element ):
 
 
 class Model( Element ):
-  def __init__( self, field_list, transaction_class, list_filter_map=None, constant_set_map=None, not_allowed_verb_list=None, *args, **kwargs ):
+  def __init__( self, field_list, transaction_class, id_field_name=None, list_filter_map=None, list_query_filter_map=None, list_query_sort_list=None, constant_set_map=None, not_allowed_verb_list=None, *args, **kwargs ):
     super().__init__( *args, **kwargs )
     self.transaction_class = transaction_class
+    self.id_field_name = id_field_name
     self.field_map = {}
     for field in field_list:
       if not isinstance( field, Field ):
@@ -591,6 +615,8 @@ class Model( Element ):
 
     self.action_map = {}
     self.list_filter_map = list_filter_map or {}  # TODO: check list_filter_map  for  saninty, should  be [ filter_name ][ paramater_name ] = Paramater
+    self.list_query_filter_map = list_query_filter_map or {}  # TODO: check this too
+    self.list_query_sort_list = list_query_sort_list or []
     self.constant_set_map = constant_set_map or {}
     self.not_allowed_verb_list = []
     for verb in not_allowed_verb_list or []:
@@ -636,11 +662,15 @@ class Model( Element ):
     for name in self.constant_set_map:
       data[ 'constants' ][ name ] = self.constant_set_map[ name ]
     data[ 'fields' ] = [ item.describe( converter ) for item in self.field_map.values() ]
+    if self.id_field_name:
+      data[ 'id-field-name' ] = self.id_field_name
     data[ 'actions' ] = [ item.path for item in self.action_map.values() ]
-    data[ 'not-allowed-methods' ] = self.not_allowed_verb_list
+    data[ 'not-allowed-verbs' ] = self.not_allowed_verb_list
     data[ 'list-filters' ] = {}
     for name in self.list_filter_map:
       data[ 'list-filters' ][ name ] = [ item.describe( converter ) for item in self.list_filter_map[ name ].values() ]
+    data[ 'query-filter-fields' ] = [ item.describe( converter ) for item in self.list_query_filter_map.values() ]
+    data[ 'query-sort-fields' ] = self.list_query_sort_list
 
     return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Model', 'Cache-Control': 'max-age=0' } )
 
@@ -709,20 +739,41 @@ class Model( Element ):
       if data is None:
         raise InvalidRequest( 'Filter Paramaters are required when Filter Name is specified' )
 
-      try:
-        paramater_map = self.list_filter_map[ filter_name ]
-      except KeyError:
-        raise InvalidRequest( 'Invalid Filter Name "{0}"'.format( filter_name ) )
-
       error_map = {}
-      for paramater_name in paramater_map:
-        paramater = paramater_map[ paramater_name ]
+      if filter_name == '_query_':
+        filter_values, error_list = self._filterConvert( data.get( 'filter', {} ), self.list_query_filter_map, converter, transaction )
+        if error_list:
+          error_map[ 'filter' ] = error_list
+
+        sort_list = data.get( 'sort', [] )
+        if not isinstance( sort_list, list ):
+          sort_list = [ sort_list ]
+
+        for entry in sort_list:
+          if not isinstance( entry, str ):
+            raise InvalidRequest( data={ 'sort': 'All Sort Fields must be a string' } )
+
+          sort_reversed = len( entry ) > 2 and entry[0] == '~'
+
+          if ( sort_reversed or entry not in self.list_query_sort_list ) and ( not sort_reversed or entry[ 1: ] not in self.list_query_sort_list ):
+            raise InvalidRequest( data={ 'sort': 'Invalid Filter Sort Field: "{0}"'.format( entry ) } )
+
+        filter_values = { 'filter': filter_values, 'sort': sort_list }
+
+      else:
         try:
-          filter_values[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
-        except ValueError as e:
-          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( e )
+          paramater_map = self.list_filter_map[ filter_name ]
         except KeyError:
-          error_map[ paramater_name ] = 'Required Paramater'
+          raise InvalidRequest( 'Invalid Filter Name "{0}"'.format( filter_name ) )
+
+        for paramater_name in paramater_map:
+          paramater = paramater_map[ paramater_name ]
+          try:
+            filter_values[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
+          except ValueError as e:
+            error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( e )
+          except KeyError:
+            error_map[ paramater_name ] = 'Required Paramater'
 
       if error_map != {}:
         raise InvalidRequest( data=error_map )
@@ -735,7 +786,7 @@ class Model( Element ):
       else:
         raise InvalidRequest( e )
 
-    if not isinstance( result, tuple ) and len( result ) != 3:
+    if result is None or ( not isinstance( result, tuple ) and len( result ) != 3 ):
       raise ServerError( 'List result is not a valid tuple' )
 
     ( id_list, position, total ) = result
@@ -745,6 +796,57 @@ class Model( Element ):
       id_list = [ '{0}:{1}:'.format( self.path, item ) for item in id_list ]
 
     return Response( 200, data=id_list, header_map={ 'Verb': 'LIST', 'Cache-Control': 'no-cache', 'Count': str( len( id_list ) ), 'Position': str( position ), 'Total': str( total ), 'Id-Only': str( id_only ) } )
+
+  def _filterConvert( self, filter_spec_map, paramater_map, converter, transaction ):
+    if not filter_spec_map:
+      return {}, []
+
+    if not isinstance( filter_spec_map, dict ):
+      raise ValueError( 'Filter Spec must be a dict/map' )
+
+    operation = filter_spec_map.get( 'operation', None )
+    field = filter_spec_map.get( 'field', None )
+    if field is not None:
+      if field not in self.list_query_filter_map.keys():
+        return {}, [ 'Invalid Filter Field: "{0}"'.format( field ) ]
+
+      if operation not in FILTER_OPERATION_LIST:
+        return {}, [ 'Invalid Filter Operation: "{0}"'.format( operation ) ]
+
+      allowed_operation_list = paramater_map[ field ].allowed_operations
+      if allowed_operation_list is not None and operation not in allowed_operation_list:
+        return {}, [ 'Not Allowed Filter Operation: "{0}"'.format( operation ) ]
+
+      try:
+        value = filter_spec_map[ 'value' ]
+      except KeyError:
+        return {}, [ 'Value Must be Specified for Filtering Entries' ]
+
+      try:
+        value = converter.toPython( paramater_map[ field ], value, transaction )
+      except ValueError as e:
+        return {}, [ 'Invalid Value "{0}" for field "{1}"'.format( e, field ) ]
+
+      return { 'field': field, 'value': value, 'operation': operation }, []
+
+    if operation is not None:
+      if operation not in ( 'not', 'or', 'and' ):
+        return {}, [ 'Invalid Operation "{0}"'.format( operation ) ]
+
+      right = filter_spec_map.get( 'right', None )
+      left = filter_spec_map.get( 'left', None )
+      if operation == 'not' and right is not None:
+        right, right_error_list = self._filterConvert( right, paramater_map, converter, transaction )
+        return { 'operation': 'not', 'right': right }, right_error_list
+
+      if operation in ( 'or', 'and' ) and left is not None and right is not None:
+        left, left_error_list = self._filterConvert( left, paramater_map, converter, transaction )
+        right, right_error_list = self._filterConvert( right, paramater_map, converter, transaction )
+        return { 'operation': operation, 'left': left, 'right': right }, left_error_list + right_error_list
+
+      return {}, [ 'Unknown/Invalid Operation and Paramaters: "{0}", Right is none: {1}, Left is none: {2}'.format( operation, right is None, left is None ) ]
+
+    return {}, [ 'Operation and/or Field not Defined' ]
 
   def create( self, converter, transaction, data ):
     if not isinstance( data, dict ):
@@ -956,21 +1058,37 @@ class Action( Element ):
       if self.static:
         raise InvalidRequest( 'Static Actions should not be passed ids' )
 
-      try:
-        if multi:
-          for object_id in id_list:
-            result[ '{0}:{1}:'.format( self.parent.path, object_id ) ] = converter.fromPython( self.return_paramater, self.func( self.parent._get( transaction, object_id ), **value_map ) )
-        else:
-          result = converter.fromPython( self.return_paramater, self.func( self.parent._get( transaction, id_list[0] ), **value_map ) )
-      except ValueError as e:
-        raise InvalidRequest( e )
+      if multi:
+        for object_id in id_list:
+          try:
+            result_value = self.func( self.parent._get( transaction, object_id ), **value_map )
+          except ValueError as e:
+            if isinstance( e.args[0], dict ):
+              raise InvalidRequest( data=e.args[0] )
+            else:
+              raise InvalidRequest( e )
+
+          try:
+            result[ '{0}:{1}:'.format( self.parent.path, object_id ) ] = converter.fromPython( self.return_paramater, result_value )
+          except ValueError as e:
+            raise InvalidRequest( 'Invalid Result Value: "{0}"'.format( e ) )
+      else:
+        result = converter.fromPython( self.return_paramater, self.func( self.parent._get( transaction, id_list[0] ), **value_map ) )
 
     else:
       if not self.static:
         raise InvalidRequest( 'Non-Static Actions should be passed ids' )
 
       try:
-        result = converter.fromPython( self.return_paramater, self.func( **value_map ) )
+        result_value = self.func( **value_map )
+      except ValueError as e:
+        if isinstance( e.args[0], dict ):
+          raise InvalidRequest( data=e.args[0] )
+        else:
+          raise InvalidRequest( e )
+
+      try:
+        result = converter.fromPython( self.return_paramater, result_value )
       except ValueError as e:
         raise InvalidRequest( 'Invalid Result Value: "{0}"'.format( e ) )
 
@@ -983,23 +1101,28 @@ class Action( Element ):
     return Response( 200, data=None, header_map=header_map )
 
 
+def defaultGetUser( cookie_map, header_map ):
+  if cookie_map or header_map:
+    raise ValueError( 'get_user not specified' )
+
+  else:
+    return AnonymousUser()
+
+
 class Server():
-  def __init__( self, root_path, root_version, debug=False, cors_allow_list=None, debug_dump_location=None ):
+  def __init__( self, root_path, root_version, get_user=None, auth_header_list=None, auth_cookie_list=None, cors_allow_origin=None, debug=False, debug_dump_location=None ):
     super().__init__()
     self.uri = URI( root_path )
+    self.get_user = get_user or defaultGetUser
+    self.auth_header_list = auth_header_list or []
+    self.auth_cookie_list = auth_cookie_list or []
+    self.cors_allow_origin = cors_allow_origin
     self.debug = debug
     self.debug_dump_location = debug_dump_location
+
     self.root_namespace = Namespace( name=None, version=root_version, root_path=root_path, converter=Converter( self.uri ) )
     self.root_namespace.checkAuth = checkAuth_true
-    self.cors_allow_list = cors_allow_list
     self.path_handlers = {}
-
-  def getUser( self, auth_id, auth_token ):
-    if auth_id is not None and auth_token is not None:
-      raise ValueError( 'getUser not implemented' )
-
-    else:
-      return AnonymousUser()
 
   def _validateModel( self, model ):
     for field_name in model.field_map:
@@ -1008,7 +1131,7 @@ class Server():
         ( mode, is_array, new_model ) = field.model_resolve( field.model )  # this is django specific again
         del field.model_resolve
         if not isinstance( new_model, Model ):
-          raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+          raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
 
         if mode is not None:
           field.mode = mode
@@ -1023,7 +1146,7 @@ class Server():
           new_model = action.return_paramater.model_resolve( action.return_paramater.model )  # this is django specific again
           del action.return_paramater.model_resolve
           if not isinstance( new_model, Model ):
-            raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+            raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
 
           action.return_paramater.model = new_model
 
@@ -1034,7 +1157,7 @@ class Server():
             new_model = paramater.model_resolve( paramater.model )  # this is django specific again
             del paramater.model_resolve
             if not isinstance( new_model, Model ):
-              raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+              raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
 
             paramater.model = new_model
 
@@ -1046,9 +1169,19 @@ class Server():
             new_model = paramater.model_resolve( paramater.model )  # this is django specific again
             del paramater.model_resolve
             if not isinstance( new_model, Model ):
-              raise ValueError( 'late resolved model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+              raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
 
             paramater.model = new_model
+
+      # for paramater_name in model.list_query_map:
+      #   paramater = model.list_query_map[ paramater_name ]
+      #   if paramater.type == 'Model' and hasattr( paramater, 'model_resolve' ):
+      #     new_model = paramater.model_resolve( paramater.model )  # this is django specific again
+      #     del paramater.model_resolve
+      #     if not isinstance( new_model, Model ):
+      #       raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+      #
+      #     paramater.model = new_model
 
   def _validateNamespace( self, namespace ):
     for name in namespace.element_map:
@@ -1110,9 +1243,11 @@ class Server():
         response = Response( 500, data={ 'message': 'Path Handler Return an Invalid Response: ({0})"{1}"'.format( type( response ).__name__, response ) } )
 
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
-    if self.cors_allow_list is not None:
-      response.header_map[ 'Access-Control-Allow-Origin' ] = ', '.join( self.cors_allow_list )
-      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id, Id-Only'  # TODO: probably should only list the ones actually sent
+    if self.cors_allow_origin is not None:
+      response.header_map[ 'Access-Control-Allow-Origin' ] = self.cors_allow_origin
+      response.header_map[ 'Access-Control-Expose-Headers' ] = 'Method, Type, Cinp-Version, Count, Position, Total, Multi-Object, Object-Id, Id-Only'  # what is exposed to script in the browser
+      if len( self.auth_cookie_list ) > 0:
+        response.header_map[ 'Access-Control-Allow-Credentials' ] = 'true'
 
     return response
 
@@ -1122,7 +1257,7 @@ class Server():
 
     try:
       ( path, model, action, id_list, multi ) = self.uri.split( request.uri )
-    except ValueError as e:
+    except ValueError:
       return Response( 400, data={ 'message': 'Unable to Parse "{0}"'.format( request.uri ) } )
 
     if id_list is not None and len( id_list ) > __MULTI_URI_MAX__:
@@ -1136,9 +1271,9 @@ class Server():
 
     if request.verb == 'OPTIONS':  # options never need auth, nor is the Cinp-Version header required, we can take care of it early
       response = element.options()
-      if self.cors_allow_list is not None:
+      if self.cors_allow_origin is not None:  # these are "preflight request" check headers
         response.header_map[ 'Access-Control-Allow-Methods' ] = response.header_map[ 'Allow' ]
-        response.header_map[ 'Access-Control-Allow-Headers' ] = 'Accept, Cinp-Version, Auth-Id, Auth-Token, Filter, Content-Type, Count, Position, Multi-Object, Id-Only'
+        response.header_map[ 'Access-Control-Allow-Headers' ] = 'Accept, Cinp-Version, Filter, Content-Type, Count, Position, Multi-Object, Id-Only' + ', '.join( self.auth_header_list )  # in a perfect world we would take the request 'Access-Control-Request-Headers' and take a union with this list, but we will leave that to the browser
 
       return response
 
@@ -1180,10 +1315,10 @@ class Server():
       elif multi:
         raise InvalidRequest( 'requested non multi-object, however multiple ids where sent' )
 
-    auth_id = request.header_map.get( 'AUTH-ID', None )
-    auth_token = request.header_map.get( 'AUTH-TOKEN', None )
+    header_map = dict( [ ( i, request.header_map.get( i, None ) ) for i in self.auth_header_list ] )
+    cookie_map = dict( [ ( i, request.cookie_map.get( i, None ) ) for i in self.auth_cookie_list ] )
 
-    user = self.getUser( auth_id, auth_token )
+    user = self.get_user( cookie_map, header_map )
     if user is None:
       return Response( 401, data={ 'message': 'Invalid Session' } )
 
@@ -1272,15 +1407,12 @@ class Server():
 
 
 class Request():
-  def __init__( self, verb, uri, header_map ):
+  def __init__( self, verb, uri, header_map, cookie_map ):
     super().__init__()
     self.verb = verb
     self.uri = uri  # make sure the query string/fragment/etc has allreay been stripped by the Child Class
-    self.header_map = {}
-    for name in header_map:
-      if name in ( 'CINP-VERSION', 'AUTH-ID', 'AUTH-TOKEN', 'CONTENT-TYPE', 'FILTER', 'POSITION', 'COUNT', 'MULTI-OBJECT', 'ID-ONLY' ):
-        self.header_map[ name ] = header_map[ name ]
-
+    self.header_map = header_map
+    self.cookie_map = cookie_map
     self.data = None
 
   def fromText( self, buff ):
@@ -1300,8 +1432,8 @@ class Request():
   def fromXML( self, buff ):
     pass
 
-  def fromBytes( self, buff ):
-    pass
+  def fromURLEncodedForm( self, buff ):
+    self.data = parse.parse_qs( buff )
 
   def __str__( self ):
     return 'Request:\n  Verb: "{0}"\n  URI: "{1}"\n  Header Map: "{2}"\n  Data: "{3}"'.format( self.verb, self.uri, self.header_map, self.data )
@@ -1314,6 +1446,7 @@ class Response():
     self.http_code = http_code
     self.data = data
     self.header_map = header_map or {}
+    self.cookie_list = []
 
   def buildNativeResponse( self ):
     if self.content_type == 'json':
@@ -1336,6 +1469,12 @@ class Response():
 
   def asBytes( self ):
     return None
+
+  def setCookie( self, key, value='', max_age=None, expires=None, path='/', domain=None, secure=False, httponly=False, samesite=None ):  # these are werkzeug's defaults
+    self.cookie_list.append( ( key, value, max_age, expires, path, domain, secure, httponly, samesite ) )
+
+  def deleteCookie( self, key, path='/', domain=None ):
+    self.setCookie( key, expires=0, max_age=0, path=path, domain=domain )
 
   def __str__( self ):
     return 'Response:\n  Content Type: "{0}"\n  HTTP Code: "{1}"\n  Header Map: "{2}"\n  Data: "{3}"'.format( self.content_type, self.http_code, self.header_map, self.data )
