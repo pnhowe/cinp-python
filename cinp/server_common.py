@@ -1273,7 +1273,7 @@ class Server():
       response = element.options()
       if self.cors_allow_origin is not None:  # these are "preflight request" check headers
         response.header_map[ 'Access-Control-Allow-Methods' ] = response.header_map[ 'Allow' ]
-        response.header_map[ 'Access-Control-Allow-Headers' ] = 'Accept, Cinp-Version, Filter, Content-Type, Count, Position, Multi-Object, Id-Only' + ', '.join( self.auth_header_list )  # in a perfect world we would take the request 'Access-Control-Request-Headers' and take a union with this list, but we will leave that to the browser
+        response.header_map[ 'Access-Control-Allow-Headers' ] = ', '.join( ['Accept, Cinp-Version, Filter, Content-Type, Count, Position, Multi-Object, Id-Only' ] + self.auth_header_list )  # in a perfect world we would take the request 'Access-Control-Request-Headers' and take a union with this list, but we will leave that to the browser
 
       return response
 
