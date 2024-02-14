@@ -24,7 +24,7 @@ class WerkzeugServer( Server ):
         else:
           message = 'Invalid Response from handle'
 
-        return werkzeug.wrappers.BaseResponse( response=message, status=500, content_type='text/plain' )
+        return werkzeug.wrappers.Response( response=message, status=500, content_type='text/plain' )
 
       return WerkzeugResponse( response ).buildNativeResponse()
 
@@ -33,7 +33,7 @@ class WerkzeugServer( Server ):
 
     except Exception as e:
       logging.exception( 'Top level Exception, "{0}"({1})'.format( e, type( e ).__name__ ) )
-      return werkzeug.wrappers.BaseResponse( response='Error getting WerkzeugResponse, "{0}"({1})'.format( e, type( e ).__name__ ), status=500, content_type='text/plain' )
+      return werkzeug.wrappers.Response( response='Error getting WerkzeugResponse, "{0}"({1})'.format( e, type( e ).__name__ ), status=500, content_type='text/plain' )
 
   def __call__( self, envrionment, start_response ):
     """
@@ -65,7 +65,7 @@ class WerkzeugServer( Server ):
 
 class WerkzeugRequest( Request ):
   def __init__( self, envrionment, *args, **kwargs ):
-    werkzeug_request = werkzeug.wrappers.BaseRequest( envrionment )
+    werkzeug_request = werkzeug.wrappers.Request( envrionment )
     header_map = {}
     for ( key, value ) in werkzeug_request.headers:
       header_map[ key.upper().replace( '_', '-' ) ] = value
@@ -149,7 +149,7 @@ class WerkzeugResponse():  # TODO: this should be a subclass of the server_commo
     else:
       content_type = self.content_type + ';charset=utf-8'
 
-    return werkzeug.wrappers.BaseResponse( response=response, status=self.status, headers=self.header_list, content_type=content_type )
+    return werkzeug.wrappers.Response( response=response, status=self.status, headers=self.header_list, content_type=content_type )
 
   def asJSON( self ):
     if self.data is None:
@@ -157,10 +157,10 @@ class WerkzeugResponse():  # TODO: this should be a subclass of the server_commo
     else:
       response = json.dumps( self.data ).encode( 'utf-8' )
 
-    return werkzeug.wrappers.BaseResponse( response=response, status=self.status, headers=self.header_list, content_type='application/json;charset=utf-8'  )
+    return werkzeug.wrappers.Response( response=response, status=self.status, headers=self.header_list, content_type='application/json;charset=utf-8'  )
 
   def asXML( self ):
-    return werkzeug.wrappers.BaseResponse( response='<xml>Not Implemented</xml>', status=self.response.http_code, headers=self.header_list, content_type='application/xml;charset=utf-8' )
+    return werkzeug.wrappers.Response( response='<xml>Not Implemented</xml>', status=self.response.http_code, headers=self.header_list, content_type='application/xml;charset=utf-8' )
 
   def asBytes( self ):
     if self.data is None:
@@ -168,4 +168,4 @@ class WerkzeugResponse():  # TODO: this should be a subclass of the server_commo
     else:
       response = self.data
 
-    return werkzeug.wrappers.BaseResponse( response=response, status=self.status, headers=self.header_list, content_type='application/octet-stream'  )
+    return werkzeug.wrappers.Response( response=response, status=self.status, headers=self.header_list, content_type='application/octet-stream'  )
