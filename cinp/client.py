@@ -13,7 +13,7 @@ from urllib import request
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '1.3.2'
+__CLIENT_VERSION__ = '1.3.3'
 __CINP_VERSION__ = '1.0'
 
 __all__ = [ 'Timeout', 'ResponseError', 'DetailedInvalidRequest',
@@ -313,13 +313,12 @@ class CInP():
     """
     Sets the Authencation id and token headers, call with out paramaters to remove the headers.
     """
-    if not auth_id:
-      logging.debug( 'cinp: removing auth info' )
-      for index in range( len( self.opener.addheaders ) - 1, -1, -1 ):
-        if self.opener.addheaders[ index ][0] in ( 'Auth-Id', 'Auth-Token' ):
-          del self.opener.addheaders[ index ]
+    logging.debug( 'cinp: removing auth info' )
+    for index in range( len( self.opener.addheaders ) - 1, -1, -1 ):
+      if self.opener.addheaders[ index ][0] in ( 'Auth-Id', 'Auth-Token' ):
+        del self.opener.addheaders[ index ]
 
-    else:
+    if auth_id:
       logging.debug( 'cinp: setting auth info, id "{0}"'.format( auth_id ) )
       self.opener.addheaders += [ ( 'Auth-Id', auth_id ), ( 'Auth-Token', auth_token ) ]
 
