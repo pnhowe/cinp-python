@@ -4,28 +4,24 @@ DISTRO_NAME := $(shell lsb_release -sc | tr A-Z a-z)
 VERSION := $(shell head -n 1 debian-common/changelog | awk '{match( $$0, /\(.+?\)/); print substr( $$0, RSTART+1, RLENGTH-2 ) }' | cut -d- -f1 )
 
 all:
-	python3 -B setup.py build
 
 install:
-ifeq (ubuntu, $(DISTRO))
-	python3 -B setup.py install --root=$(DESTDIR) --install-purelib=/usr/lib/python3/dist-packages/ --prefix=/usr --no-compile -O0
-else
-	python3 -B setup.py install --root=$(DESTDIR) --prefix=/usr --no-compile -O0
-endif
+	pip3 install . --target="$(DESTDIR)/usr/lib/python3/dist-packages" --no-deps --no-compile --no-build-isolation
 
 version:
 	echo $(VERSION)
 
 clean:
-	python3 -B setup.py clean || true
-	$(RM) -fr build
-	$(RM) -f dpkg
-	$(RM) -f rpm
-	$(RM) -fr htmlcov
+	$(RM) -r build
+	$(RM) dpkg
+	$(RM) rpm
+	$(RM) -r htmlcov
 	$(RM) cinp/django_settings.py || true
 ifeq (ubuntu, $(DISTRO))
 	dh_clean || true
 endif
+	find -name *.pyc -delete
+	find -name __pycache__ -delete
 
 dist-clean: clean
 	$(RM) -fr debian
@@ -39,7 +35,7 @@ dist-clean: clean
 .PHONY:: all install version clean dist-clean
 
 test-blueprints:
-	echo ubuntu-focal-base
+	echo ubuntu-noble-base
 
 test-requires:
 	echo flake8 python3-cinp python3-pytest python3-pytest-cov python3-pytest-mock python3-werkzeug python3-pip python3-django python3-pytest-django
@@ -58,7 +54,7 @@ test:
 .PHONY:: test-blueprints lint-requires lint test-requires test
 
 dpkg-blueprints:
-	echo ubuntu-xenial-base ubuntu-bionic-base ubuntu-focal-base
+	echo ubuntu-xenial-base ubuntu-bionic-base ubuntu-noble-base
 
 dpkg-requires:
 	echo dpkg-dev debhelper python3-dev python3-setuptools dh-python
