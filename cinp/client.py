@@ -1,19 +1,17 @@
 import os
-import socket
 import json
 import logging
 import ssl
-import http.client
-import time
 import math
 import random
+import asyncio
+import httpcore
 from datetime import datetime
 from tempfile import NamedTemporaryFile
-from urllib import request
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '1.3.3'
+__CLIENT_VERSION__ = '1.4.0'
 __CINP_VERSION__ = '1.0'
 
 __all__ = [ 'Timeout', 'ResponseError', 'DetailedInvalidRequest',
@@ -24,14 +22,6 @@ DELAY_MULTIPLIER = 15
 # delay of 15 results in a delay of:
 # min delay = 0, 10, 16, 20, 24, 26, 29, 31, 32, 34, 35, 37, 38, 39, 40 ....
 # max delay = 0, 20, 32, 40, 48, 52, 58, 62, 64, 68, 70, 74, 76, 78, 80 .....
-
-DEFAULT_RETRY_ON = [
-                     'Timeout:None',
-                     'ResponseError:[Errno 101] Network is unreachable',
-                     'ResponseError:[Errno 104] Connection reset by peer',
-                     'ResponseError:Connection reset by peer',
-                     'ResponseError:[Errno 111] Connection refused'
-                  ]
 
 
 class Timeout( Exception ):
@@ -77,9 +67,8 @@ class ServerError( Exception ):
 
 
 class RetryableException( Exception ):
-  def __init__( self, exception, reason=None ):
+  def __init__( self, exception ):
     self.exception = exception
-    self.reason = reason
 
 
 def _backOffDelay( count ):
@@ -90,10 +79,25 @@ def _backOffDelay( count ):
   return int( factor + ( random.random() * factor ) )
 
 
+def _headerMapToList( header_map ):
+  return [ ( k.encode( 'ascii' ), v.encode( 'ascii' ) ) for k, v in header_map.items() ]
+
+
+def _headerListToMap( header_list ):
+  header_map = {}
+  for ( k, v ) in header_list:
+    header_map[ k.decode( 'ascii' ) ] = v.decode( 'ascii' )
+
+  return header_map
+
+
 class CInP():
   def __init__( self, host, root_path, proxy=None, verify_ssl=True, retry_event=None ):  # retry_event should be an Event Object, use to cancel retry loops, if the event get's set the retry loop will throw the most recent Exception it ignored
     super().__init__()
-    self.retry_event = retry_event
+    if retry_event is not None:
+      self.retry_event = retry_event
+    else:
+      self.retry_event = asyncio.Event()
 
     if not host.startswith( ( 'http:', 'https:' ) ):
       raise ValueError( 'hostname must start with http(s):' )
@@ -107,30 +111,38 @@ class CInP():
 
     self.uri = URI( root_path )
 
-    self.opener = request.OpenerDirector()
-
-    if self.proxy:  # not doing 'is not None', so empty strings don't try and proxy   # have a proxy option to take it from the envrionment vars
-      self.opener.add_handler( request.ProxyHandler( { 'http': self.proxy, 'https': self.proxy } ) )
+    if not verify_ssl:
+      self.ssl_context = ssl._create_unverified_context()
     else:
-      self.opener.add_handler( request.ProxyHandler( {} ) )
+      self.ssl_context = ssl.create_default_context()
 
-    self.opener.add_handler( request.HTTPHandler() )
-    if hasattr( http.client, 'HTTPSConnection' ):
-      if not verify_ssl:
-        self.opener.add_handler( request.HTTPSHandler( context=ssl._create_unverified_context() ) )
-      else:
-        self.opener.add_handler( request.HTTPSHandler() )
+    self.connection_pool = None
 
-    self.opener.add_handler( request.UnknownHandler() )
+    self.header_list = _headerMapToList( {
+                                            'User-Agent': 'python CInP client {0}'.format( __CLIENT_VERSION__ ),
+                                            'Accepts': 'application/json',
+                                            'Accept-Charset': 'utf-8',
+                                            'CInP-Version': __CINP_VERSION__
+                                          } )
 
-    self.opener.addheaders = [
-                                ( 'User-Agent', 'python CInP client {0}'.format( __CLIENT_VERSION__ ) ),
-                                ( 'Accepts', 'application/json' ),
-                                ( 'Accept-Charset', 'utf-8' ),
-                                ( 'CInP-Version', __CINP_VERSION__ )
-                              ]
+    self.auth_header_list = []
 
-  def _checkRequest( self, verb, uri, data ):  # TODO: also check if verb is allowed to have headers ( other than thoes provided by the opener ), also check to make sure they are valid heaaders
+  async def __aenter__( self ):
+    # have a proxy option to take it from the envrionment vars
+    if self.proxy:  # not doing 'is not None', so empty strings don't try and proxy
+      proxy = httpcore.Proxy( self.proxy )
+    else:
+      proxy = None
+
+    self.connection_pool = httpcore.AsyncConnectionPool( ssl_context=self.ssl_context )  # , proxy=proxy )  need a newer version of httpcore to support proxy, also make sure if we still need python3-anyio
+
+    return self
+
+  async def __aexit__( self, exc_type, exc_value, traceback ):
+    await self.connection_pool.aclose()
+    self.connection_pool = None
+
+  def _checkRequest( self, verb, uri, data ):  # TODO: also check if verb is allowed to have headers ( other than the default ), also check to make sure they are valid heaaders
     logging.debug( 'cinp: check "{0}" to "{1}"'.format( verb, uri ) )
 
     if verb not in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL', 'DESCRIBE' ):
@@ -168,36 +180,34 @@ class CInP():
     if verb in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL' ) and not model:
       raise InvalidRequest( 'Verb "{0}" requires model'.format( verb ) )
 
-  def _request( self, verb, uri, data=None, header_map=None, timeout=30, retry_count=0, retry_on=None ):
-    _retry_on = retry_on or DEFAULT_RETRY_ON
+  async def _request( self, verb, uri, data=None, header_map=None, timeout=30, retry_count=0 ):
+    if self.connection_pool is None:
+      raise Exception( 'Connection pool is not initialized, make sure to use "async with CInP(...) as client:"' )
 
     last_exception = None
     for retry in range( 0, retry_count + 1 ):
       if retry > 0:
         logging.debug( 'cinp: retry "{0}" of "{1}" for request to "{2}"'.format( retry, retry_count, uri ) )
-        if self.retry_event is not None:
-          if self.retry_event.is_set():
-            raise last_exception
+        if self.retry_event.is_set():
+          raise last_exception
 
-          self.retry_event.wait( _backOffDelay( retry ) )
-
+        try:
+          await asyncio.wait_for( self.retry_event.wait(), _backOffDelay( retry ) )
+        except asyncio.TimeoutError:
+          pass
         else:
-          time.sleep( _backOffDelay( retry ) )
+          logging.debug( 'cinp: request aborted' )
+          raise Exception( 'Request Aborted' )
 
       try:
-        return self.__request( verb, uri, data, header_map, timeout )
+        return await self.__request( verb, uri, data, header_map, timeout )
       except RetryableException as e:
-        signature = '{0}:{1}'.format( e.exception.__class__.__name__, e.reason )
-        if signature not in _retry_on:
-          logging.debug( 'cinp: exception signature "{0}" not in the retry_on list'.format( signature ) )
-          raise e.exception
-
-        logging.debug( 'cinp: got exception "{0}", ignoring...'.format( e ) )
+        logging.debug( 'cinp: got exception "{0}", retrying...'.format( e ) )
         last_exception = e.exception
 
     raise last_exception
 
-  def __request( self, verb, uri, data=None, header_map=None, timeout=30 ):
+  async def __request( self, verb, uri, data=None, header_map=None, timeout=30 ):
     logging.debug( 'cinp: making "{0}" request to "{1}"'.format( verb, uri ) )
     if header_map is None:
       header_map = {}
@@ -217,69 +227,58 @@ class CInP():
       if data is None:
         data = ''.encode( 'utf-8' )
       else:
-        data = json.dumps( data, default=JSONDefault ).encode( 'utf-8' )
+        data = json.dumps( data, default=JSONEncoder ).encode( 'utf-8' )
 
+    header_list = self.header_list + self.auth_header_list + _headerMapToList( header_map )
     url = '{0}{1}'.format( self.host, uri )
-    req = request.Request( url, data=data, headers=header_map, method=verb )
     try:
-      resp = self.opener.open( req, timeout=timeout )
+      resp = await self.connection_pool.request( verb, url, content=data, headers=header_list, extensions={ 'timeout': { 'connect': timeout } } )
+      http_code = resp.status
+      if http_code not in ( 200, 201, 202, 400, 401, 403, 404, 500 ):
+        raise ResponseError( 'HTTP code "{0}" unhandled'.format( http_code ) )
 
-    except request.HTTPError as e:
-      raise RetryableException( ResponseError( 'HTTPError "{0}"'.format( e ) ), reason=e.reason )
+      logging.debug( 'cinp: got HTTP code "{0}"'.format( http_code ) )
 
-    except request.URLError as e:
-      if isinstance( e.reason, socket.timeout ):
-        raise RetryableException( Timeout( 'Request Timeout after {0} seconds'.format( timeout ) ) )
+      if http_code == 401:
+        resp.close()
+        logging.warning( 'cinp: Invalid Session' )
+        raise InvalidSession()
 
-      raise RetryableException( ResponseError( 'URLError "{0}" for "{1}" via "{2}"'.format( e, url, self.proxy ) ), reason=e.reason )
+      if http_code == 403:
+        resp.close()
+        logging.warning( 'cinp: Not Authorized' )
+        raise NotAuthorized()
 
-    except socket.timeout:
-      raise RetryableException( Timeout( 'Request Timeout after {0} seconds'.format( timeout ) ) )
+      if http_code == 404:
+        resp.close()
+        logging.warning( 'cinp: Not Found' )
+        raise NotFound()
 
-    except OSError as e:
-      raise RetryableException( ResponseError( 'Socket Error "{0}"'.format( e ) ), reason=e.strerror )
-
-    http_code = resp.code
-    if http_code not in ( 200, 201, 202, 400, 401, 403, 404, 500 ):
-      raise ResponseError( 'HTTP code "{0}" unhandled'.format( resp.code ) )
-
-    logging.debug( 'cinp: got HTTP code "{0}"'.format( http_code ) )
-
-    if http_code == 401:
-      resp.close()
-      logging.warning( 'cinp: Invalid Session' )
-      raise InvalidSession()
-
-    if http_code == 403:
-      resp.close()
-      logging.warning( 'cinp: Not Authorized' )
-      raise NotAuthorized()
-
-    if http_code == 404:
-      resp.close()
-      logging.warning( 'cinp: Not Found' )
-      raise NotFound()
-
-    buff = str( resp.read(), 'utf-8' ).strip()
-    if not buff:
-      data = None
-    else:
-      try:
-        data = json.loads( buff )
-      except ValueError:
+      buff = str( resp.content, 'utf-8' ).strip()
+      if not buff:
         data = None
-        if http_code not in ( 400, 500 ):  # these two codes can deal with non dict data
-          logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
-          raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
+      else:
+        try:
+          data = json.loads( buff )
+        except ValueError:
+          data = None
+          if http_code not in ( 400, 500 ):  # these two codes can deal with non dict data
+            logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
+            raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
 
-    header_map = {}
-    for item in ( 'Position', 'Count', 'Total', 'Type', 'Multi-Object', 'Object-Id', 'verb' ):
-      try:
-        header_map[ item ] = resp.headers[ item ]
-      except KeyError:
-        pass
+        header_map = { k: v for k, v in _headerListToMap( resp.headers ).items() if k in ( 'Position', 'Count', 'Total', 'Type', 'Multi-Object', 'Object-Id', 'verb' ) }
 
-    resp.close()
+    except httpcore.ProtocolError as e:
+      raise Exception( ResponseError( 'ProtocolError "{0}"'.format( e ) ) )
+
+    except httpcore.ProxyError as e:
+      raise Exception( ResponseError( 'ProxyError "{0}" for "{1}" via "{2}"'.format( e, url, self.proxy ) ) )
+
+    except httpcore.NetworkError as e:
+      raise RetryableException( ResponseError( 'NetworkError "{0}"'.format( e ) ) )
+
+    except httpcore.TimeoutException:
+      raise RetryableException( Timeout( 'Request Timeout after {0} seconds'.format( timeout ) ) )
 
     if http_code == 400:
       try:
@@ -314,20 +313,18 @@ class CInP():
     Sets the Authencation id and token headers, call with out paramaters to remove the headers.
     """
     logging.debug( 'cinp: removing auth info' )
-    for index in range( len( self.opener.addheaders ) - 1, -1, -1 ):
-      if self.opener.addheaders[ index ][0] in ( 'Auth-Id', 'Auth-Token' ):
-        del self.opener.addheaders[ index ]
+    self.auth_header_list = []
 
     if auth_id:
       logging.debug( 'cinp: setting auth info, id "{0}"'.format( auth_id ) )
-      self.opener.addheaders += [ ( 'Auth-Id', auth_id ), ( 'Auth-Token', auth_token ) ]
+      self.auth_header_list = _headerMapToList( { 'Auth-Id': auth_id, 'Auth-Token': auth_token } )
 
-  def describe( self, uri, timeout=30, retry_count=0, retry_on=None ):
+  async def describe( self, uri, timeout=30, retry_count=0 ):
     """
     DESCRIE
     """
     logging.debug( 'cinp: DESCRIBE "{0}"'.format( uri ) )
-    ( http_code, data, header_map ) = self._request( 'DESCRIBE', uri, timeout=timeout, retry_count=retry_count, retry_on=retry_on )
+    ( http_code, data, header_map ) = await self._request( 'DESCRIBE', uri, timeout=timeout, retry_count=retry_count )
 
     if http_code != 200:
       logging.warning( 'cinp: Unexpected HTTP Code "{0}" for DESCRIBE'.format( http_code ) )
@@ -335,7 +332,7 @@ class CInP():
 
     return data, header_map[ 'Type' ]
 
-  def list( self, uri, filter_name=None, filter_value_map=None, position=0, count=10, timeout=30, retry_count=0, retry_on=None ):
+  async def list( self, uri, filter_name=None, filter_value_map=None, position=0, count=10, timeout=30, retry_count=0 ):
     """
     LIST
     """
@@ -353,7 +350,7 @@ class CInP():
       header_map[ 'Filter' ] = filter_name
 
     logging.debug( 'cinp: LIST "{0}" with filter "{1}"'.format( uri, filter_name ) )
-    ( http_code, id_list, header_map ) = self._request( 'LIST', uri, data=filter_value_map, header_map=header_map, timeout=timeout, retry_count=retry_count, retry_on=retry_on )
+    ( http_code, id_list, header_map ) = await self._request( 'LIST', uri, data=filter_value_map, header_map=header_map, timeout=timeout, retry_count=retry_count )
 
     if http_code != 200:
       logging.warning( 'cinp: Unexpected HTTP Code "{0}" for LIST'.format( http_code ) )
@@ -372,7 +369,7 @@ class CInP():
 
     return ( id_list, count_map )
 
-  def get( self, uri, force_multi_mode=False, timeout=30, retry_count=0, retry_on=None ):
+  async def get( self, uri, force_multi_mode=False, timeout=30, retry_count=0 ):
     """
     GET
     """
@@ -381,7 +378,7 @@ class CInP():
       header_map[ 'Multi-Object' ] = True
 
     logging.debug( 'cinp: GET "{0}"'.format( uri ) )
-    ( http_code, rec_values, header_map ) = self._request( 'GET', uri, header_map=header_map, timeout=timeout, retry_count=retry_count, retry_on=retry_on )
+    ( http_code, rec_values, header_map ) = await self._request( 'GET', uri, header_map=header_map, timeout=timeout, retry_count=retry_count )
 
     if http_code != 200:
       logging.warning( 'cinp: Unexpected HTTP Code "{0}" for GET'.format( http_code ) )
@@ -393,7 +390,7 @@ class CInP():
 
     return rec_values
 
-  def create( self, uri, values, timeout=30, retry_count=0, retry_on=None ):
+  async def create( self, uri, values, timeout=30, retry_count=0 ):
     """
     CREATE
     """
@@ -401,7 +398,7 @@ class CInP():
       raise InvalidRequest( 'values must be a dict' )
 
     logging.debug( 'cinp: CREATE "{0}"'.format( uri ) )
-    ( http_code, rec_values, header_map ) = self._request( 'CREATE', uri, data=values, timeout=timeout, retry_count=retry_count, retry_on=retry_on )
+    ( http_code, rec_values, header_map ) = await self._request( 'CREATE', uri, data=values, timeout=timeout, retry_count=retry_count )
 
     if http_code != 201:
       logging.warning( 'cinp: Unexpected HTTP Code "{0}" for CREATE'.format( http_code ) )
@@ -418,7 +415,7 @@ class CInP():
 
     return ( object_id, rec_values )
 
-  def update( self, uri, values, force_multi_mode=False, timeout=30, retry_count=0, retry_on=None ):
+  async def update( self, uri, values, force_multi_mode=False, timeout=30, retry_count=0 ):
     """
     UPDATE
     """
@@ -430,7 +427,7 @@ class CInP():
       header_map[ 'Multi-Object' ] = True
 
     logging.debug( 'cinp: UPDATE "{0}"'.format( uri ) )
-    ( http_code, rec_values, _ ) = self._request( 'UPDATE', uri, data=values, header_map=header_map, timeout=timeout, retry_count=retry_count, retry_on=retry_on )
+    ( http_code, rec_values, _ ) = await self._request( 'UPDATE', uri, data=values, header_map=header_map, timeout=timeout, retry_count=retry_count )
 
     if http_code != 200:
       logging.warning( 'cinp: Unexpected HTTP Code "{0}" for UPDATE'.format( http_code ) )
@@ -442,12 +439,12 @@ class CInP():
 
     return rec_values
 
-  def delete( self, uri, timeout=30, retry_count=0, retry_on=None ):
+  async def delete( self, uri, timeout=30, retry_count=0 ):
     """
     DELETE
     """
     logging.debug( 'cinp: DELETE "{0}"'.format( uri ) )
-    ( http_code, _, _ ) = self._request( 'DELETE', uri, timeout=timeout, retry_count=retry_count, retry_on=retry_on )
+    ( http_code, _, _ ) = await self._request( 'DELETE', uri, timeout=timeout, retry_count=retry_count )
 
     if http_code != 200:
       logging.warning( 'cinp: Unexpected HTTP Code "{0}" for DELETE'.format( http_code ) )
@@ -455,7 +452,7 @@ class CInP():
 
     return True
 
-  def call( self, uri, args, force_multi_mode=False, timeout=30, retry_count=0, retry_on=None ):
+  async def call( self, uri, args, force_multi_mode=False, timeout=30, retry_count=0 ):
     """
     CALL
     """
@@ -467,7 +464,7 @@ class CInP():
       header_map[ 'Multi-Object' ] = True
 
     logging.debug( 'cinp: CALL "{0}"'.format( uri ) )
-    ( http_code, return_value, _ ) = self._request( 'CALL', uri, data=args, header_map=header_map, timeout=timeout, retry_count=retry_count, retry_on=retry_on )
+    ( http_code, return_value, _ ) = await self._request( 'CALL', uri, data=args, header_map=header_map, timeout=timeout, retry_count=retry_count )
 
     if http_code != 200:
       logging.warning( 'cinp: Unexpected HTTP Code "{0}" for CALL'.format( http_code ) )
@@ -475,7 +472,7 @@ class CInP():
 
     return return_value
 
-  def getMulti( self, uri, id_list=None, chunk_size=10, retry_count=0, retry_on=None ):
+  async def getMulti( self, uri, id_list=None, chunk_size=10, retry_count=0 ):
     """
     returns a generator that will iterate over the uri/id_list, reterieving from the server in chunk_size blocks
     each item is ( rec_id, rec_values )
@@ -498,7 +495,7 @@ class CInP():
     pos = 0
 
     while pos < len( id_list ):
-      tmp_data = self.get( self.uri.build( namespace, model, None, id_list[ pos: pos + chunk_size ] ), force_multi_mode=True, retry_count=retry_count, retry_on=retry_on )
+      tmp_data = await self.get( self.uri.build( namespace, model, None, id_list[ pos: pos + chunk_size ] ), force_multi_mode=True, retry_count=retry_count )
       pos += chunk_size
       for key in tmp_data:
         result_list.append( ( key, tmp_data[ key ] ) )
@@ -506,21 +503,21 @@ class CInP():
       while len( result_list ) > 0:
         yield result_list.pop( 0 )
 
-  def getFilteredObjects( self, uri, filter_name=None, filter_value_map=None, list_chunk_size=100, get_chunk_size=10, timeout=30, retry_count=0, retry_on=None ):
+  async def getFilteredObjects( self, uri, filter_name=None, filter_value_map=None, list_chunk_size=100, get_chunk_size=10, timeout=30, retry_count=0 ):
     pos = 0
     total = 1
     while pos < total:
-      ( tmp_id_list, count_map ) = self.list( uri, filter_name=filter_name, filter_value_map=filter_value_map, position=pos, count=list_chunk_size, retry_count=retry_count, retry_on=retry_on )
+      ( tmp_id_list, count_map ) = await self.list( uri, filter_name=filter_name, filter_value_map=filter_value_map, position=pos, count=list_chunk_size, retry_count=retry_count )
       id_list = self.uri.extractIds( tmp_id_list )
       pos = count_map[ 'position' ] + count_map[ 'count' ]
       total = count_map[ 'total' ]
-      return self.getMulti( uri, id_list, get_chunk_size, retry_count=retry_count, retry_on=retry_on )  # TODO: need to found out how to get the next chunk, return/yeild something
+      return self.getMulti( uri, id_list, get_chunk_size, retry_count=retry_count )  # TODO: need to found out how to get the next chunk, return/yeild something
 
-  def getFilteredURIs( self, uri, filter_name=None, filter_value_map=None, list_chunk_size=100, get_chunk_size=10, timeout=30, retry_count=0, retry_on=None ):
+  async def getFilteredURIs( self, uri, filter_name=None, filter_value_map=None, list_chunk_size=100, get_chunk_size=10, timeout=30, retry_count=0 ):
     pos = 0
     total = 1
     while pos < total:
-      ( tmp_id_list, count_map ) = self.list( uri, filter_name=filter_name, filter_value_map=filter_value_map, position=pos, count=list_chunk_size, retry_count=retry_count, retry_on=retry_on )
+      ( tmp_id_list, count_map ) = await self.list( uri, filter_name=filter_name, filter_value_map=filter_value_map, position=pos, count=list_chunk_size, retry_count=retry_count )
       id_list = self.uri.extractIds( tmp_id_list )
       pos = count_map[ 'position' ] + count_map[ 'count' ]
       total = count_map[ 'total' ]
@@ -528,7 +525,7 @@ class CInP():
       while len( id_list ) > 0:
         yield id_list.pop( 0 )
 
-  def getFile( self, uri, target_dir='/tmp', file_object=None, cb=None, timeout=30, chunk_size=( 4096 * 1024 ) ):
+  async def getFile( self, uri, target_dir='/tmp', file_object=None, cb=None, timeout=30, chunk_size=( 4096 * 1024 ) ):
     """
     if file_object is defined:
        The file contense are written to it and the filename as specified by the
@@ -552,59 +549,56 @@ class CInP():
 
     # Due to the return value we have to do our own request, this is pretty much a stright GET
     url = '{0}{1}'.format( self.host, uri )
-    req = request.Request( url )
-    req.get_method = lambda: 'GET'
-    try:
-      resp = self.opener.open( req, timeout=timeout )
-
-    except request.HTTPError as e:
-      raise ResponseError( 'HTTPError "{0}"'.format( e ) )
-
-    except request.URLError as e:
-      if isinstance( e.reason, socket.timeout ):
-        raise Timeout( 'Request Timeout after {0} seconds'.format( timeout ) )
-
-      raise ResponseError( 'URLError "{0}" for "{1}" via "{2}"'.format( e, url, self.proxy ) )
-
-    http_code = resp.code
-    if http_code != 200:
-      logging.warning( 'cinp: Unexpected HTTP Code "{0}" for File Get'.format( http_code ) )
-      raise ResponseError( 'Unexpected HTTP Code "{0}" for File Get'.format( http_code ) )
 
     try:
-      size = resp.headers[ 'Content-Length' ]
-    except KeyError:
-      size = 0
+      async with self.connection_pool.request( 'GET', url, headers=self.header_list + self.auth_header_list, extensions={ 'timeout': { 'connect': timeout } } ) as resp:
+        http_code = resp.status
+        if http_code != 200:
+          logging.warning( 'cinp: Unexpected HTTP Code "{0}" for File Get'.format( http_code ) )
+          raise ResponseError( 'Unexpected HTTP Code "{0}" for File Get'.format( http_code ) )
 
-    if file_object is not None:
-      file_writer = file_object
+        header_map = _headerListToMap( resp.headers )
 
-    else:
-      if filename is None:
-        file_writer = NamedTemporaryFile( dir=target_dir, mode='wb' )
-        filename = file_writer.name
+        try:
+          size = header_map[ 'Content-Length' ]
+        except KeyError:
+          size = 0
 
-      else:
-        filename = os.path.join( target_dir, filename )
-        file_writer = open( filename, 'wb' )
+        if file_object is not None:
+          file_writer = file_object
 
-    buff = resp.read( chunk_size )
-    while buff:
-      file_writer.write( buff )
-      if cb:
-        cb( file_writer.tell(), size )
-      buff = resp.read( chunk_size )
+        else:
+          if filename is None:
+            file_writer = NamedTemporaryFile( dir=target_dir, mode='wb' )
+            filename = file_writer.name
 
-    resp.close()
+          else:
+            filename = os.path.join( target_dir, filename )
+            file_writer = open( filename, 'wb' )
 
-    if file_object is not None:
-      return filename
+        async for buff in resp.iter_stream():
+          file_writer.write( buff )
+          if cb:
+            cb( file_writer.tell(), size )
 
-    else:
+    except httpcore.ProtocolError as e:
+      raise ResponseError( 'ProtocolError "{0}"'.format( e ) )
+
+    except httpcore.ProxyError as e:
+      raise ResponseError( 'ProxyError "{0}" for "{1}" via "{2}"'.format( e, url, self.proxy ) )
+
+    except httpcore.NetworkError as e:
+      raise ResponseError( 'NetworkError "{0}"'.format( e ) )
+
+    except httpcore.TimeoutException:
+      raise Timeout( 'Request Timeout after {0} seconds'.format( timeout ) )
+
+    if file_object is None:
       file_writer.close()
-      return filename
 
-  def uploadFile( self, uri, filepath, filename=None, cb=None, timeout=30 ):
+    return filename
+
+  async def uploadFile( self, uri, filepath, filename=None, cb=None, timeout=30 ):
     """
     filepath can be a string of the path name or a file object.  If a file object
     either specify the filename or make sure your file object exposes the attribute
@@ -638,7 +632,7 @@ class CInP():
                    'Content-Length': len( file_reader )
                  }
 
-    ( http_code, data, _ ) = self._request( 'UPLOAD', uri_parser.build( namespace, model ), data=file_reader, header_map=header_map, timeout=timeout )
+    ( http_code, data, _ ) = await self._request( 'UPLOAD', uri_parser.build( namespace, model ), data=file_reader, header_map=header_map, timeout=timeout )
 
     if http_code != 202:
       logging.warning( 'cinp: Unexpected HTTP Code "{0}" for File Upload'.format( http_code ) )
@@ -663,8 +657,9 @@ class _readerWrapper():
     return buff
 
 
-def JSONDefault( obj ):
-   if isinstance( obj, datetime ):
-     return obj.isoformat()
+class JSONEncoder( json.JSONEncoder ):
+  def default( self, obj ):
+    if isinstance( obj, datetime ):
+      return obj.isoformat()
 
-   return json.JSONEncoder.default( obj )
+    return super().default( obj )
