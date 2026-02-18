@@ -1,3 +1,16 @@
+cinp (1.4.0-1) DIST; urgency=medium
+
+  * should be fully async and context manager now
+
+ -- Peter Howe <pnhowe@gmail.com>  Fri, 9 Jan 2026 18:06:13 -0600
+
+cinp (1.3.1-1) DIST; urgency=medium
+
+  * auth header header handeling tweeks
+  * support for newer Werkzeug
+
+ -- Peter Howe <pnhowe@gmail.com>  Tue, 16 Sep 2025 18:06:13 -0600
+
 cinp (1.3.0-1) DIST; urgency=medium
 
   * more flexable query filtering

@@ -78,14 +78,14 @@ class WerkzeugRequest( Request ):
 
     content_type = self.header_map.get( 'CONTENT-TYPE', None )
     if content_type is not None:  # if it is none, there isn't (or shoudn't) be anthing to bring in anyway
-      if content_type.startswith( 'application/json' ):
-        self.fromJSON( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) )  # hopfully the request isn't larger than 160k, if so, we may need to rethink things
+      if content_type.startswith( 'application/json' ):  # TODO: we should have the from??? read the stream it's self without having to convert to a string first, try json.load on the stream directly
+        self.fromJSON( str( werkzeug_request.stream.read( 524288 ), 'utf-8' ) )  # hopfully the request isn't larger than 512k, if so, we may need to rethink things
 
       elif content_type.startswith( 'text/plain' ):
-        self.fromText( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) )
+        self.fromText( str( werkzeug_request.stream.read( 524288 ), 'utf-8' ) )
 
       elif content_type.startswith( 'application/xml' ):
-        self.fromXML( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) )
+        self.fromXML( str( werkzeug_request.stream.read( 524288 ), 'utf-8' ) )
 
       elif content_type.startswith( 'application/octet-stream' ):
         self.stream = werkzeug_request.stream
@@ -94,7 +94,7 @@ class WerkzeugRequest( Request ):
         pass  # do nothing, down stream is going to have to read from the stream
 
       elif content_type.startswith( 'application/x-www-form-urlencoded' ):
-        self.fromURLEncodedForm( str( werkzeug_request.stream.read( 164160 ), 'utf-8' ) )  # TODO: re-evulate to see if all these need to be converted to string first, newer versions of python might handle them right
+        self.fromURLEncodedForm( str( werkzeug_request.stream.read( 524288 ), 'utf-8' ) )  # TODO: re-evulate to see if all these need to be converted to string first, newer versions of python might handle them right
 
       else:
         raise InvalidRequest( message='Unknown Content-Type "{0}"'.format( content_type ) )
