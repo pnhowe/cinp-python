@@ -2,12 +2,12 @@ Source: cinp
 Section: utils
 Priority: optional
 Maintainer: Peter Howe <pnhowe@gmail.com>
-Build-Depends: debhelper (>= 9), python3 (>= 3.10), python3-dev (>= 3.10), dh-python, python3-setuptools, lsb-release
+Build-Depends: debhelper (>= 9), python3 (>= 3.12), python3-dev (>= 3.12), python3-pip (>= 3.12), python3-httpcore, dh-python, python3-setuptools, lsb-release
 Standards-Version: 3.8.3
 X-Python3-Version: >= 3.10
 
 Package: python3-cinp
 Architecture: all
-Depends: python3 (>= 3.10), python3-httpcore, python3-anyio, python3-dateutil, ${misc:Depends}, ${python3:Depends}
+Depends: python3 (>= 3.12), python3-httpcore, python3-anyio, python3-dateutil, ${misc:Depends}, ${python3:Depends}
 Description: CInP Python Client and Server
   CInP Python Client and Server
