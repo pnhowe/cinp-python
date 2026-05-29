@@ -11,35 +11,42 @@ class NoCINP( Exception ):
 
 
 class WerkzeugServer( Server ):
-  def __init__( self, *args, **kwargs ):
-    super().__init__( *args, **kwargs )
-
-  def handle( self, envrionment ):
+  def handle( self, environment ):
     try:
-      response = super().handle( WerkzeugRequest( envrionment ) )
+      response = super().handle( WerkzeugRequest( environment ) )
 
       if not isinstance( response, Response ):
         if self.debug:
-          message = 'Invalid Response from handle, got "{0}" expected WerkzeugResponse'.format( type( response ).__name__ )
+          message = 'Invalid Response from handle, got "{0}" expected Response'.format( type( response ).__name__ )
         else:
           message = 'Invalid Response from handle'
 
-        return werkzeug.wrappers.Response( response=message, status=500, content_type='text/plain' )
-
-      return WerkzeugResponse( response ).buildNativeResponse()
+        response = Response( 500, data={ 'message': message } )
 
     except InvalidRequest as e:
-      return WerkzeugResponse( e.asResponse() ).buildNativeResponse()
+      response = e.asResponse()
 
     except Exception as e:
       logging.exception( 'Top level Exception, "{0}"({1})'.format( e, type( e ).__name__ ) )
-      return werkzeug.wrappers.Response( response='Error getting WerkzeugResponse, "{0}"({1})'.format( e, type( e ).__name__ ), status=500, content_type='text/plain' )
+      if self.debug:
+        message = 'Top level Exception, "{0}"({1})'.format( e, type( e ).__name__ )
+      else:
+        message = 'Top level Exception'
 
-  def __call__( self, envrionment, start_response ):
+      response = Response( 500, data={ 'message': message } )
+
+    try:
+      return WerkzeugResponse( response ).buildNativeResponse()
+
+    except Exception as e:  # last ditch effort, the response it's self could not be converted
+      logging.exception( 'Exception building the response, "{0}"({1})'.format( e, type( e ).__name__ ) )
+      return werkzeug.wrappers.Response( response='Error building the response', status=500, content_type='text/plain' )
+
+  def __call__( self, environment, start_response ):
     """
     called by werkzeug for every request
     """
-    return self.handle( envrionment )( envrionment, start_response )
+    return self.handle( environment )( environment, start_response )
 
   # add a namespace to the path, either from included module, or an empty namespace with name and version
   def registerNamespace( self, path, module=None, name=None, version=None ):
@@ -64,46 +71,49 @@ class WerkzeugServer( Server ):
 
 
 class WerkzeugRequest( Request ):
-  def __init__( self, envrionment, *args, **kwargs ):
-    werkzeug_request = werkzeug.wrappers.Request( envrionment )
+  def __init__( self, environment, *args, **kwargs ):
+    werkzeug_request = werkzeug.wrappers.Request( environment )
     header_map = {}
     for ( key, value ) in werkzeug_request.headers:
       header_map[ key.upper().replace( '_', '-' ) ] = value
 
+    self.max_request_size = 524288  # 512k bytes
+
     # script_root should be what ever path was consumed by the script handler configuration
     # ie: the  "/api" of: WSGIScriptAlias /api <path to wsgi script>
     uri = werkzeug_request.script_root + werkzeug_request.path
-
     super().__init__( verb=werkzeug_request.method.upper(), uri=uri, header_map=header_map, cookie_map=werkzeug_request.cookies, *args, **kwargs )
 
     content_type = self.header_map.get( 'CONTENT-TYPE', None )
-    if content_type is not None:  # if it is none, there isn't (or shoudn't) be anthing to bring in anyway
-      if content_type.startswith( 'application/json' ):  # TODO: we should have the from??? read the stream it's self without having to convert to a string first, try json.load on the stream directly
-        self.fromJSON( str( werkzeug_request.stream.read( 524288 ), 'utf-8' ) )  # hopfully the request isn't larger than 512k, if so, we may need to rethink things
+    content_length = werkzeug_request.content_length
+    if content_length is not None and content_length > self.max_request_size and content_type is not None and not content_type.startswith( 'application/octet-stream' ):
+      raise InvalidRequest( 'Request body too large' )  # hopefully the request isn't larger than 512k, if so, we may need to rethink things
+
+    stream = werkzeug.wsgi.LimitedStream( werkzeug_request.stream, self.max_request_size, is_max=True )
+
+    if content_type is not None:  # if it is none, there isn't (or shouldn't) be anything to bring in anyway
+      if content_type.startswith( 'application/json' ):
+        self.fromJSON( stream )
 
       elif content_type.startswith( 'text/plain' ):
-        self.fromText( str( werkzeug_request.stream.read( 524288 ), 'utf-8' ) )
+        self.fromText( stream )
 
       elif content_type.startswith( 'application/xml' ):
-        self.fromXML( str( werkzeug_request.stream.read( 524288 ), 'utf-8' ) )
+        self.fromXML( stream )
 
       elif content_type.startswith( 'application/octet-stream' ):
         self.stream = werkzeug_request.stream
-        if 'CONTENT-DISPOSITION' in header_map:  # cheet a little, Content-Disposition isn't pure CInP, but this is a bolt on file uploader
+        if 'CONTENT-DISPOSITION' in header_map:  # cheat a little, Content-Disposition isn't pure CInP, but this is a bolt on file uploader
           self.header_map[ 'CONTENT-DISPOSITION' ] = header_map[ 'CONTENT-DISPOSITION' ]
         pass  # do nothing, down stream is going to have to read from the stream
 
       elif content_type.startswith( 'application/x-www-form-urlencoded' ):
-        self.fromURLEncodedForm( str( werkzeug_request.stream.read( 524288 ), 'utf-8' ) )  # TODO: re-evulate to see if all these need to be converted to string first, newer versions of python might handle them right
+        self.fromURLEncodedForm( stream )  # TODO: pass in the encoding as well so it can be handled better
 
       else:
         raise InvalidRequest( message='Unknown Content-Type "{0}"'.format( content_type ) )
 
-    if 'X-FORWARDED-FOR' in header_map:  # hm... should we really be doing this here?
-      self.remote_addr = header_map[ 'X-FORWARDED-FOR' ]
-    else:
-      self.remote_addr = werkzeug_request.remote_addr
-
+    self.remote_addr = werkzeug_request.remote_addr
     self.is_secure = werkzeug_request.is_secure
 
     werkzeug_request.close()
@@ -160,7 +170,7 @@ class WerkzeugResponse():  # TODO: this should be a subclass of the server_commo
     return werkzeug.wrappers.Response( response=response, status=self.status, headers=self.header_list, content_type='application/json;charset=utf-8'  )
 
   def asXML( self ):
-    return werkzeug.wrappers.Response( response='<xml>Not Implemented</xml>', status=self.response.http_code, headers=self.header_list, content_type='application/xml;charset=utf-8' )
+    return werkzeug.wrappers.Response( response='<xml>Not Implemented</xml>', status=self.status, headers=self.header_list, content_type='application/xml;charset=utf-8' )
 
   def asBytes( self ):
     if self.data is None:

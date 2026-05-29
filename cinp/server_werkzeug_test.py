@@ -1,5 +1,6 @@
 import pytest
 import json
+from io import BytesIO
 
 from werkzeug.datastructures import Headers
 
@@ -9,17 +10,6 @@ from cinp.server_werkzeug import WerkzeugServer, WerkzeugRequest, WerkzeugRespon
 
 def getUser( auth_id, auth_token ):
   return AnonymousUser()
-
-
-class FakeBody():  # set wsgi.input to  and instance of FakeBody, and set wsgi.input_terminated to true to make it work
-  def __init__( self, data ):
-    self.data = data.encode( 'utf-8' )
-
-  def read( self, count ):
-    return self.data
-
-  def close( self ):
-    pass
 
 
 def test_werkzeug_request():
@@ -38,7 +28,7 @@ def test_werkzeug_request():
           'REQUEST_METHOD': 'get',
           'wsgi.url_scheme': 'http',
           'wsgi.input_terminated': True,
-          'wsgi.input': FakeBody( '"test"' )
+          'wsgi.input': BytesIO( b'"This will be ignored"' )  # no content type, this is just ignored
         }
   req = WerkzeugRequest( env )
   assert req.verb == 'GET'
@@ -46,6 +36,7 @@ def test_werkzeug_request():
   assert req.header_map == { 'ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'ACCEPT-ENCODING': 'gzip, deflate', 'CONNECTION': 'keep-alive', 'HOST': '127.0.0.1:8888', 'USER-AGENT': 'Mozilla/5.0' }
   assert req.data is None  # no content type the wsgi.input should be ignored
 
+  data = b'{ "this": "works" }'
   env = {
           'SERVER_PROTOCOL': 'HTTP/1.1',
           'QUERY_STRING': '',
@@ -62,19 +53,20 @@ def test_werkzeug_request():
           'REMOTE_ADDR': '127.0.0.1',
           'REQUEST_METHOD': 'DELETE',
           'CONTENT_TYPE': 'application/json;charset=utf-8',
-          'HTTP_CINP_VERSION': '1.0',
+          'HTTP_CINP_VERSION': '2.0',
           'HTTP_CONNECTION': 'keep-alive',
           'HTTP_POSITION': 50,
           'HTTP_COUNT': 34,
           'HTTP_MULTI_OBJECT': True,
+          'CONTENT_LENGTH': str( len( data ) ),
           'wsgi.url_scheme': 'http',
           'wsgi.input_terminated': True,
-          'wsgi.input': FakeBody( '{ "this": "works" }' )
+          'wsgi.input': BytesIO( data )
         }
   req = WerkzeugRequest( env )
   assert req.verb == 'DELETE'
   assert req.uri == '/api/ns/model:key:'
-  assert req.header_map == { 'CINP-VERSION': '1.0', 'CONTENT-TYPE': 'application/json;charset=utf-8', 'FILTER': 'curent', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'kd8dkv&TTIv893ink', 'POSITION': '50', 'COUNT': '34', 'MULTI-OBJECT': 'True', 'ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'ACCEPT-ENCODING': 'gzip, deflate', 'CONNECTION': 'keep-alive', 'HOST': '127.0.0.1:8888', 'USER-AGENT': 'Mozilla/5.0' }
+  assert req.header_map == { 'CINP-VERSION': '2.0', 'CONTENT-TYPE': 'application/json;charset=utf-8', 'FILTER': 'curent', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'kd8dkv&TTIv893ink', 'POSITION': 50, 'COUNT': 34, 'MULTI-OBJECT': True, 'ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'ACCEPT-ENCODING': 'gzip, deflate', 'CONNECTION': 'keep-alive', 'CONTENT-LENGTH': str( len( data ) ), 'HOST': '127.0.0.1:8888', 'USER-AGENT': 'Mozilla/5.0' }
   assert req.data == { 'this': 'works' }
 
 
@@ -110,13 +102,13 @@ def test_werkzeug_server():
 
   env = {
           'PATH_INFO': '/api/',
-          'HTTP_CINP_VERSION': '1.0',
+          'HTTP_CINP_VERSION': '2.0',
           'REQUEST_METHOD': 'DESCRIBE',
           'wsgi.url_scheme': 'http',
           'wsgi.input_terminated': True,
-          'wsgi.input': FakeBody( '' )
+          'wsgi.input': BytesIO( b'' )
         }
   wresp = server.handle( env )
   assert wresp.status_code == 200
-  assert wresp.headers == Headers( [ ( 'Cache-Control', 'max-age=0' ), ( 'Cinp-Version', '1.0' ), ( 'Content-Type', 'application/json;charset=utf-8' ), ( 'Content-Length', '120' ), ( 'Verb', 'DESCRIBE' ), ( 'Type', 'Namespace' ) ] )
+  assert wresp.headers == Headers( [ ( 'Cache-Control', 'max-age=0' ), ( 'Cinp-Version', '2.0' ), ( 'Content-Type', 'application/json;charset=utf-8' ), ( 'Content-Length', '120' ), ( 'Verb', 'DESCRIBE' ), ( 'Type', 'Namespace' ) ] )
   assert json.loads( str( wresp.data, 'utf-8' ) ) == { 'multi-uri-max': 100, 'api-version': '0.0', 'path': '/api/', 'namespaces': [ '/api/ns1/' ], 'models': [], 'name': 'root' }

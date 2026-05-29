@@ -63,7 +63,7 @@ class User( models.Model ):
   def is_anonymous( self ):
     return False
 
-  @cinp.action( paramater_type_list=[ 'String' ] )
+  @cinp.action( parameter_type_list=[ 'String' ] )
   def setPassword( self, password ):
     self.password = hashlib.sha256( password.encode( 'utf-8' ) ).hexdigest()
     self.save()
@@ -91,7 +91,7 @@ class Session( models.Model ):
   def is_active( self ):
     return self.last_checkin < ( datetime.now( timezone.utc ) + timedelta( seconds=30 ) )
 
-  @cinp.action( return_type='String', paramater_type_list=[ 'String', 'String' ] )
+  @cinp.action( return_type='String', parameter_type_list=[ 'String', 'String' ] )
   @staticmethod
   def login( username, password ):
     try:

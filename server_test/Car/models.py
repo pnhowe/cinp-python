@@ -54,12 +54,12 @@ class Car( models.Model ):
   updated = models.DateTimeField( editable=False, auto_now=True )
   created = models.DateTimeField( editable=False, auto_now_add=True )
 
-  @cinp.action( paramater_type_list=[ { 'type': 'Model', 'model': 'User.models.User' } ] )
+  @cinp.action( parameter_type_list=[ { 'type': 'Model', 'model': 'User.models.User' } ] )
   def sell( self, to ):
     self.owner = to
     self.save()
 
-  @cinp.list_filter( name='owner', paramater_type_list=[ { 'type': 'Model', 'model': 'User.models.User' } ] )
+  @cinp.list_filter( name='owner', parameter_type_list=[ { 'type': 'Model', 'model': 'User.models.User' } ] )
   @staticmethod
   def filter_by_owner( owner ):
     return Car.objects.filter( owner=owner )
