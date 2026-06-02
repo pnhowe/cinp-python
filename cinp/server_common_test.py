@@ -654,8 +654,7 @@ def test_request():
   req.fromJSON( StringIO( '{ "key": "value" }' ) )
   assert req.data == { 'key': 'value' }
 
-  with pytest.raises( InvalidRequest ):
-    req.fromJSON( StringIO( '' ) )
+  req.fromJSON( StringIO( '' ) )
   assert req.data is None
 
   req.fromJSON( StringIO( '[ 1 ,2 ,3 ]' ) )

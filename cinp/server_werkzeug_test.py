@@ -69,6 +69,39 @@ def test_werkzeug_request():
   assert req.header_map == { 'CINP-VERSION': '2.0', 'CONTENT-TYPE': 'application/json;charset=utf-8', 'FILTER': 'curent', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'kd8dkv&TTIv893ink', 'POSITION': 50, 'COUNT': 34, 'MULTI-OBJECT': True, 'ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'ACCEPT-ENCODING': 'gzip, deflate', 'CONNECTION': 'keep-alive', 'CONTENT-LENGTH': str( len( data ) ), 'HOST': '127.0.0.1:8888', 'USER-AGENT': 'Mozilla/5.0' }
   assert req.data == { 'this': 'works' }
 
+  data = b''
+  env = {
+          'SERVER_PROTOCOL': 'HTTP/1.1',
+          'QUERY_STRING': '',
+          'HTTP_HOST': '127.0.0.1:8888',
+          'HTTP_ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'PATH_INFO': '/api/ns/',
+          'HTTP_USER_AGENT': 'Mozilla/5.0',
+          'SERVER_PORT': '8888',
+          'HTTP_ACCEPT_ENCODING': 'gzip, deflate',
+          'HTTP_AUTH_ID': 'root',
+          'HTTP_AUTH_TOKEN': 'kd8dkv&TTIv893ink',
+          'HTTP_FILTER': 'curent',
+          'SCRIPT_NAME': '',
+          'REMOTE_ADDR': '127.0.0.1',
+          'REQUEST_METHOD': 'DESCRIBE',
+          'CONTENT_TYPE': 'application/json;charset=utf-8',
+          'HTTP_CINP_VERSION': '2.0',
+          'HTTP_CONNECTION': 'keep-alive',
+          'HTTP_POSITION': 50,
+          'HTTP_COUNT': 34,
+          'HTTP_MULTI_OBJECT': True,
+          'CONTENT_LENGTH': str( len( data ) ),
+          'wsgi.url_scheme': 'http',
+          'wsgi.input_terminated': True,
+          'wsgi.input': BytesIO( data )
+        }
+  req = WerkzeugRequest( env )
+  assert req.verb == 'DESCRIBE'
+  assert req.uri == '/api/ns/'
+  assert req.header_map == { 'CINP-VERSION': '2.0', 'CONTENT-TYPE': 'application/json;charset=utf-8', 'FILTER': 'curent', 'AUTH-ID': 'root', 'AUTH-TOKEN': 'kd8dkv&TTIv893ink', 'POSITION': 50, 'COUNT': 34, 'MULTI-OBJECT': True, 'ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'ACCEPT-ENCODING': 'gzip, deflate', 'CONNECTION': 'keep-alive', 'CONTENT-LENGTH': str( len( data ) ), 'HOST': '127.0.0.1:8888', 'USER-AGENT': 'Mozilla/5.0' }
+  assert req.data is None
+
 
 def test_werkzeug_response():
   resp = Response( 201, { 'hi': 'there' }, { 'hdr': 'big' } )

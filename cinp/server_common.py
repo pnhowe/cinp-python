@@ -132,8 +132,7 @@ def _debugDump( location, request, exception, id, auth_header_list=None, auth_co
   with writer as fp:
     fp.write( '** id: {0}\n'.format( id ) )
     fp.write( '** Request **\n' )
-    fp.write( 'Verb: "{0}"\n  URI: "{1}"\n  Header Map: "{2}"\n  Cookie Map: "{3}"\n  Data: "{4}"'.format(
-      request.verb, request.uri, headers, cookies, request.data ) )
+    fp.write( 'Verb: "{0}"\n  URI: "{1}"\n  Header Map: "{2}"\n  Cookie Map: "{3}"\n  Data: "{4}"'.format( request.verb, request.uri, headers, cookies, request.data ) )
     fp.write( '\n\n** Stack **\n' )
     traceback.print_exception( None, exception, exception.__traceback__, file=fp )
 
@@ -1475,6 +1474,11 @@ class Request():
   def fromJSON( self, stream ):
     try:
       self.data = json.load( stream )
+    except json.JSONDecodeError as e:
+      self.data = None
+      if e.doc == '':
+        return
+      raise InvalidRequest( 'Error Parsing JSON Request data: "{0}"'.format( e ) )
     except ValueError as e:
       self.data = None
       raise InvalidRequest( 'Error Parsing JSON Request data: "{0}"'.format( e ) )
