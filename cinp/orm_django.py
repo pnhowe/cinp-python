@@ -9,13 +9,13 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError, AppRegis
 from django.db.models import fields, ProtectedError
 from django.core.files import File
 
-from cinp.server_common import Converter, Namespace, Model, Action, Paramater, FilterParamater, Field, InvalidRequest, ServerError, checkAuth_true, checkAuth_false, MAP_TYPE_CONVERTER
+from cinp.server_common import Converter, Namespace, Model, Action, Parameter, FilterParameter, Field, InvalidRequest, checkAuth_true, checkAuth_false, MAP_TYPE_CONVERTER
 
 __MODEL_REGISTRY__ = {}
 
 # TODO: take advantage of .save( update_fields=.... ) on UPDATE
 
-HAS_VIEW_PERMISSION = int( django.get_version().split( '.' )[0] ) >= 2 and int( django.get_version().split( '.' )[1] ) >= 1
+HAS_VIEW_PERMISSION = ( int( django.get_version().split( '.' )[0] ), int( django.get_version().split( '.' )[1] ) ) >= ( 2, 1 )
 
 
 def field_model_resolver( django_field ):
@@ -48,7 +48,7 @@ def field_model_resolver( django_field ):
   else:
     django_model = remote_field.model
 
-  if isinstance( django_model, str ):  # this catches the case where there is a circular app refrence, so django has yet to fully map one of the sides when this is run
+  if isinstance( django_model, str ):  # this catches the case where there is a circular app reference, so django has yet to fully map one of the sides when this is run
     try:
       ( app_name, model_name ) = django_model.split( '.' )
     except ValueError:
@@ -72,14 +72,14 @@ def field_model_resolver( django_field ):
   return ( mode, is_array, model )
 
 
-def paramater_model_resolver( model_name ):
+def parameter_model_resolver( model_name ):
   if not isinstance( model_name, str ):
     model_name = '{0}.{1}'.format( model_name.__module__, model_name.__name__ )
 
   try:
     model = __MODEL_REGISTRY__[ model_name ]
   except KeyError:
-    raise ValueError( 'Unknown paramater model "{0}" make sure it is registered'.format( model_name ) )
+    raise ValueError( 'Unknown parameter model "{0}" make sure it is registered'.format( model_name ) )
 
   return model
 
@@ -88,57 +88,57 @@ def property_model_resolver( model_name ):
   try:
     model = __MODEL_REGISTRY__[ model_name ]
   except KeyError:
-    raise ValueError( 'Unknown paramater model "{0}" make sure it is registered'.format( model_name ) )
+    raise ValueError( 'Unknown parameter model "{0}" make sure it is registered'.format( model_name ) )
 
   return ( None, None, model )
 
 
-def _paramater_type_to_paramater( paramater_type, extra ):
-  if paramater_type is None:
+def _parameter_type_to_parameter( parameter_type, extra ):
+  if parameter_type is None:
     return None
 
   result = {}
 
-  if isinstance( paramater_type, dict ):
-    result[ 'type' ] = paramater_type[ 'type' ]
+  if isinstance( parameter_type, dict ):
+    result[ 'type' ] = parameter_type[ 'type' ]
 
     try:
-      result[ 'doc' ] = paramater_type[ 'doc' ]
+      result[ 'doc' ] = parameter_type[ 'doc' ]
     except KeyError:
       pass
 
     try:
-      result[ 'length' ] = paramater_type[ 'length' ]
+      result[ 'length' ] = parameter_type[ 'length' ]
     except KeyError:
       pass
 
     try:
-      result[ 'is_array' ] = paramater_type[ 'is_array' ]
+      result[ 'is_array' ] = parameter_type[ 'is_array' ]
     except KeyError:
       pass
 
     try:
-      result[ 'choice_list' ] = paramater_type[ 'choice_list' ]
+      result[ 'choice_list' ] = parameter_type[ 'choice_list' ]
     except KeyError:
       pass
 
     try:
-      result[ 'allowed_scheme_list' ] = paramater_type[ 'allowed_scheme_list' ]
+      result[ 'allowed_scheme_list' ] = parameter_type[ 'allowed_scheme_list' ]
     except KeyError:
       pass
 
-    paramater_model_name = paramater_type.get( 'model', None )
-    if paramater_model_name is not None:
+    parameter_model_name = parameter_type.get( 'model', None )
+    if parameter_model_name is not None:
       try:
-        model = paramater_model_resolver( paramater_model_name )
+        model = parameter_model_resolver( parameter_model_name )
       except ValueError:  # model_resolver had issues, try late resolving
-        result[ 'model' ] = paramater_model_name
-        result[ 'model_resolve' ] = paramater_model_resolver
+        result[ 'model' ] = parameter_model_name
+        result[ 'model_resolve' ] = parameter_model_resolver
       else:
         result[ 'model' ] = model
 
   else:
-    result[ 'type' ] = paramater_type
+    result[ 'type' ] = parameter_type
 
   if extra is not None:
     result.update( extra )
@@ -146,29 +146,33 @@ def _paramater_type_to_paramater( paramater_type, extra ):
   return result
 
 
-def paramater_type_to_paramater( paramater_type, extra=None ):
-  kwargs = _paramater_type_to_paramater( paramater_type, extra )
+def parameter_type_to_parameter( parameter_type, extra=None ):
+  kwargs = _parameter_type_to_parameter( parameter_type, extra )
   if kwargs is None:
     return None
 
-  return Paramater( **kwargs )
+  return Parameter( **kwargs )
 
 
-def paramater_type_to_filter_paramater( paramater_type ):
-  kwargs = _paramater_type_to_paramater( paramater_type, None )
+def parameter_type_to_filter_parameter( parameter_type ):
+  kwargs = _parameter_type_to_parameter( parameter_type, None )
   if kwargs is None:
     return None
 
-  kwargs[ 'name' ] = paramater_type[ 'name' ]
-  kwargs[ 'allowed_operations' ] = paramater_type.get( 'allowed_operations', None )
+  kwargs[ 'name' ] = parameter_type[ 'name' ]
+  kwargs[ 'allowed_operations' ] = parameter_type.get( 'allowed_operations', None )
 
-  return FilterParamater( **kwargs )
+  return FilterParameter( **kwargs )
+
+
+def make_action_auth( check_auth, action_name ):
+  return lambda user, verb, id_list: check_auth( user, verb, id_list, action_name )
 
 
 class DjangoConverter( Converter ):
-  def _toPython( self, paramater, cinp_value, transaction ):
-    if paramater.type == 'File':
-      value = super()._toPython( paramater, cinp_value, transaction )
+  def _toPython( self, parameter, cinp_value, transaction ):
+    if parameter.type == 'File':
+      value = super()._toPython( parameter, cinp_value, transaction )
       if value is None:
         return None
 
@@ -177,28 +181,28 @@ class DjangoConverter( Converter ):
       if filename is None:
         filename = ''.join( random.choices( '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-', k=20 ) )
 
-      if isinstance( paramater, Field ):
-        return File( paramater.django_field.save( filename, reader ) )
+      if isinstance( parameter, Field ):
+        return File( parameter.django_field.save( filename, reader ) )
 
       else:
         return File( reader, filename )
 
-    return super()._toPython( paramater, cinp_value, transaction )
+    return super()._toPython( parameter, cinp_value, transaction )
 
-  def _fromPython( self, paramater, python_value ):
-    if paramater.type == 'Model':
+  def _fromPython( self, parameter, python_value ):
+    if parameter.type == 'Model':
       if python_value is None:
         return None
 
-      return '{0}:{1}:'.format( paramater.model.path, python_value.pk )
+      return '{0}:{1}:'.format( parameter.model.path, python_value.pk )
 
-    if paramater.type == 'File':
+    if parameter.type == 'File':
       if python_value is None:
         return None
 
       return python_value.url
 
-    return super()._fromPython( paramater, python_value )
+    return super()._fromPython( parameter, python_value )
 
 
 # decorator for the models
@@ -235,13 +239,13 @@ class DjangoCInP():
       namespace.addElement( model )
       model.checkAuth = check_auth
       for action in self.action_map.get( model.name, [] ):
-        action.checkAuth = eval( 'lambda user, verb, id_list: check_auth( user, verb, id_list, "{0}" )'.format( action.name ), { 'check_auth': check_auth } )  # TODO: eval ew, find a better way
+        action.checkAuth = make_action_auth( check_auth, action.name )
         model.addAction( action )
 
     return namespace
 
   # decorators
-  def model( self, hide_field_list=None, show_field_list=None, property_list=None, constant_set_map=None, not_allowed_verb_list=None, read_only_list=None, cache_length=3600 ):
+  def model( self, hide_field_list=None, show_field_list=None, property_list=None, constant_set_map=None, not_allowed_verb_list=None, read_only_list=None ):
     def decorator( cls ):
       global __MODEL_REGISTRY__
 
@@ -305,10 +309,10 @@ class DjangoCInP():
           kwargs[ 'type' ] = 'String'
           kwargs[ 'length' ] = django_field.max_length
 
-        elif internal_type in ( 'DecimalField', 'IntegerField', 'SmallIntegerField', 'PositiveIntegerField', 'PositiveSmallIntegerField', 'AutoField' ) or cinp_type == 'Integer':
+        elif internal_type in ( 'IntegerField', 'SmallIntegerField', 'PositiveIntegerField', 'PositiveSmallIntegerField', 'AutoField' ) or cinp_type == 'Integer':
           kwargs[ 'type' ] = 'Integer'
 
-        elif internal_type in ( 'FloatField', ) or cinp_type == 'Float':
+        elif internal_type in ( 'FloatField', 'DecimalField' ) or cinp_type == 'Float':
           kwargs[ 'type' ] = 'Float'
 
         elif internal_type in ( 'BooleanField', 'NullBooleanField' ) or cinp_type == 'Boolean':
@@ -324,7 +328,7 @@ class DjangoCInP():
           kwargs[ 'type' ] = 'File'
           kwargs[ 'allowed_scheme_list' ] = None  # find some meta location to pass this in
 
-        elif internal_type in ( 'ForeignKey', 'ManyToManyField', 'OneToOneField' ) or cinp_type == 'Modal':
+        elif internal_type in ( 'ForeignKey', 'ManyToManyField', 'OneToOneField' ) or cinp_type == 'Model':
           kwargs[ 'type' ] = 'Model'
 
           try:
@@ -367,12 +371,12 @@ class DjangoCInP():
                      'is_array': item.get( 'is_array', False )
                    }
 
-          paramater_model_name = item.get( 'model', None )
-          if paramater_model_name is not None:
+          parameter_model_name = item.get( 'model', None )
+          if parameter_model_name is not None:
             try:
-              model = paramater_model_resolver( paramater_model_name )
+              model = parameter_model_resolver( parameter_model_name )
             except ValueError:  # model_resolver had issues, try late resolving
-              kwargs[ 'model' ] = paramater_model_name
+              kwargs[ 'model' ] = parameter_model_name
               kwargs[ 'model_resolve' ] = property_model_resolver   # yes we are sending different than we called
             else:
               kwargs[ 'model' ] = model
@@ -415,10 +419,10 @@ class DjangoCInP():
 
     return decorator
 
-  def staticModel( self, not_allowed_verb_list=None, cache_length=3600 ):
+  def staticModel( self, not_allowed_verb_list=None ):
     def decorator( cls ):
       name = cls.__qualname__
-      not_allowed_verb_list_ = list( set( [ 'LIST', 'GET', 'CREATE', 'UPDATE', 'DELETE' ] ).union( set( not_allowed_verb_list or [] ) ) )
+      not_allowed_verb_list_ = list( { 'LIST', 'GET', 'CREATE', 'UPDATE', 'DELETE' }.union( set( not_allowed_verb_list or [] ) ) )
 
       try:
         doc = cls.__doc__.strip()
@@ -431,7 +435,7 @@ class DjangoCInP():
 
     return decorator
 
-  def action( self, return_type=None, paramater_type_list=None ):  # must decorate the @staticmethod decorator to detect if it is static or not
+  def action( self, return_type=None, parameter_type_list=None ):  # must decorate the @staticmethod decorator to detect if it is static or not
     def decorator( func ):
       if type( func ).__name__ == 'staticmethod':
         static = True
@@ -439,38 +443,38 @@ class DjangoCInP():
       else:
         static = False
 
-      paramater_type_list_ = paramater_type_list or []
+      parameter_type_list_ = parameter_type_list or []
       ( model_name, name ) = func.__qualname__.split( '.' )
       if model_name not in self.action_map:
         self.action_map[ model_name ] = []
 
       if static:
-        paramater_name_list = func.__code__.co_varnames[ 0:func.__code__.co_argcount ]
+        parameter_name_list = func.__code__.co_varnames[ 0:func.__code__.co_argcount ]
       else:
-        paramater_name_list = func.__code__.co_varnames[ 1:func.__code__.co_argcount ]  # skip 'self'
+        parameter_name_list = func.__code__.co_varnames[ 1:func.__code__.co_argcount ]  # skip 'self'
 
       default_list = func.__defaults__
-      default_offset = len( paramater_name_list ) - len( default_list or [] )
+      default_offset = len( parameter_name_list ) - len( default_list or [] )
 
-      if len( paramater_name_list ) != len( paramater_type_list_ ):
-        raise ValueError( 'paramater_name_list({0}) is not the same length as paramater_type_list({1}) for "{2}" of "{3}"'.format( len( paramater_name_list ), len( paramater_type_list_ ), name, model_name ) )
+      if len( parameter_name_list ) != len( parameter_type_list_ ):
+        raise ValueError( 'parameter_name_list({0}) is not the same length as parameter_type_list({1}) for "{2}" of "{3}"'.format( len( parameter_name_list ), len( parameter_type_list_ ), name, model_name ) )
 
-      paramater_list = []
-      for index in range( 0, len( paramater_type_list_ ) ):
-        extra = { 'name': paramater_name_list[ index ] }
+      parameter_list = []
+      for index in range( 0, len( parameter_type_list_ ) ):
+        extra = { 'name': parameter_name_list[ index ] }
         if index >= default_offset:
           extra[ 'default' ] = default_list[ index - default_offset ]
 
-        paramater_list.append( paramater_type_to_paramater( paramater_type_list_[ index ], extra ) )
+        parameter_list.append( parameter_type_to_parameter( parameter_type_list_[ index ], extra ) )
 
-      return_paramater = paramater_type_to_paramater( return_type )
+      return_parameter = parameter_type_to_parameter( return_type )
 
       try:
         doc = func.__doc__.strip()
       except AttributeError:
         doc = ''
 
-      self.action_map[ model_name ].append( Action( name=name, doc=doc, func=func, return_paramater=return_paramater, paramater_list=paramater_list, static=static ) )
+      self.action_map[ model_name ].append( Action( name=name, doc=doc, func=func, return_parameter=return_parameter, parameter_list=parameter_list, static=static ) )
       return func
 
     return decorator
@@ -536,28 +540,28 @@ class DjangoCInP():
 
     return False
 
-  def list_filter( self, name, paramater_type_list=None ):
+  def list_filter( self, name, parameter_type_list=None ):
     def decorator( func ):
       if type( func ).__name__ != 'staticmethod':
         raise ValueError( 'list_filter func must be a staticmethod' )
 
-      paramater_type_list_ = paramater_type_list or []
+      parameter_type_list_ = parameter_type_list or []
       ( model_name, _ ) = func.__func__.__qualname__.split( '.' )
 
       if model_name not in self.list_filter_map:
         self.list_filter_map[ model_name ] = {}
 
-      paramater_name_list = func.__func__.__code__.co_varnames[ 0:func.__func__.__code__.co_argcount ]
+      parameter_name_list = func.__func__.__code__.co_varnames[ 0:func.__func__.__code__.co_argcount ]
 
-      if len( paramater_name_list ) != len( paramater_type_list_ ):
-        raise ValueError( 'paramater_name_list({0}) is not the same length as paramater_type_list({1}) for filter "{2}" of "{3}"'.format( len( paramater_name_list ), len( paramater_type_list_ ), name, model_name ) )
+      if len( parameter_name_list ) != len( parameter_type_list_ ):
+        raise ValueError( 'parameter_name_list({0}) is not the same length as parameter_type_list({1}) for filter "{2}" of "{3}"'.format( len( parameter_name_list ), len( parameter_type_list_ ), name, model_name ) )
 
-      paramater_map = {}
-      for index in range( 0, len( paramater_type_list_ ) ):
-        paramater = paramater_type_to_paramater( paramater_type_list_[ index ], { 'name': paramater_name_list[ index ] } )
-        paramater_map[ paramater.name ] = paramater
+      parameter_map = {}
+      for index in range( 0, len( parameter_type_list_ ) ):
+        parameter = parameter_type_to_parameter( parameter_type_list_[ index ], { 'name': parameter_name_list[ index ] } )
+        parameter_map[ parameter.name ] = parameter
 
-      self.list_filter_map[ model_name ][ name ] = ( func.__func__, paramater_map )
+      self.list_filter_map[ model_name ][ name ] = ( func.__func__, parameter_map )
 
       return func
 
@@ -570,7 +574,7 @@ class DjangoCInP():
 
       filter_map = {}
       for filter in field_list:
-        filter_map[ filter[ 'name' ] ] = paramater_type_to_filter_paramater( filter )
+        filter_map[ filter[ 'name' ] ] = parameter_type_to_filter_parameter( filter )
 
       model_name_parts = func.__func__.__qualname__.split( '.' )
       self.list_query_filter_map[ '.'.join( model_name_parts[ :-1 ] ) ] = ( func.__func__, filter_map )
@@ -676,7 +680,7 @@ class DjangoTransaction():  # NOTE: developed on Postgres
       try:
         filter_func = model._django_filter_funcs_map[ filter_name ]
       except KeyError:
-        raise ServerError( 'filter_func for "{0}" not found'.format( filter_name ) )  # the filter_name should of allready been checked, something is seriously wrong
+        raise ValueError( 'filter_func for "{0}" not found'.format( filter_name ) )  # the filter_name should of already been checked, something is seriously wrong
 
       qs = filter_func( **filter_values )
 
@@ -695,7 +699,7 @@ class DjangoTransaction():  # NOTE: developed on Postgres
     field = filter_spec_map.get( 'field', None )
     if field is not None:
       try:
-        operation = { '=': 'exact', '!=': 'neq', '<': 'lt', '>': 'gt', '<=': 'lte', '>=': 'gte', 'startswith': 'startswith', 'endswith': 'endswith', 'contains': 'contains' }[ operation ]
+        operation = { '=': 'exact', '<': 'lt', '>': 'gt', '<=': 'lte', '>=': 'gte', 'startswith': 'startswith', 'endswith': 'endswith', 'contains': 'contains' }[ operation ]
       except KeyError:
         raise ValueError( 'Invalid Filter Operation: "{0}"'.format( operation ) )
 
@@ -707,7 +711,7 @@ class DjangoTransaction():  # NOTE: developed on Postgres
         return filter_query
 
       if not isinstance( filter_query, dict ):
-        raise Exception( 'filter_query is not a dict' )
+        raise TypeError( 'filter_query is not a dict' )
 
       return Q( **filter_query )
 
@@ -715,13 +719,13 @@ class DjangoTransaction():  # NOTE: developed on Postgres
       right = filter_spec_map.get( 'right', None )
       left = filter_spec_map.get( 'left', None )
       if operation == 'not' and right is not None:
-        return ~Q( self._filter( right, model ) )
+        return ~self._filter( right, model )
 
       if operation == 'or' and left is not None and right is not None:
-        return Q( self._filter( left, model ) ) | Q( self._filter( right, model ) )
+        return self._filter( left, model ) | self._filter( right, model )
 
       if operation == 'and' and left is not None and right is not None:
-        return Q( self._filter( left, model ) ) & Q( self._filter( right, model ) )
+        return self._filter( left, model ) & self._filter( right, model )
 
     raise ValueError( 'Invalid Filter Spec' )
 

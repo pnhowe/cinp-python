@@ -1,5 +1,5 @@
 SECRET_KEY = 'asdfasdfasdf'
-
+USE_TZ = True
 
 DATABASES = {
               'default': {

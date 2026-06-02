@@ -11,12 +11,12 @@ from tempfile import NamedTemporaryFile
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '1.4.0'
-__CINP_VERSION__ = '1.0'
+__CLIENT_VERSION__ = '2.0.0'
+__CINP_VERSION__ = '2.0'
 
 __all__ = [ 'Timeout', 'ResponseError', 'DetailedInvalidRequest',
             'InvalidRequest', 'InvalidSession', 'NotAuthorized',
-            'NotFound', 'ServerError', 'CInP' ]
+            'NotFound', 'ServerError', 'CInP', 'RequestAborted' ]
 
 DELAY_MULTIPLIER = 15
 # delay of 15 results in a delay of:
@@ -69,6 +69,10 @@ class ServerError( Exception ):
 class RetryableException( Exception ):
   def __init__( self, exception ):
     self.exception = exception
+
+
+class RequestAborted( Exception ):
+  pass
 
 
 def _backOffDelay( count ):
@@ -128,17 +132,17 @@ class CInP():
     self.auth_header_list = []
 
   async def __aenter__( self ):
-    # have a proxy option to take it from the envrionment vars
     if self.proxy:  # not doing 'is not None', so empty strings don't try and proxy
-      proxy = httpcore.Proxy( self.proxy )
+      self.connection_pool = httpcore.AsyncHTTPProxy( proxy_url=self.proxy, ssl_context=self.ssl_context )
     else:
-      proxy = None
-
-    self.connection_pool = httpcore.AsyncConnectionPool( ssl_context=self.ssl_context )  # , proxy=proxy )  need a newer version of httpcore to support proxy, also make sure if we still need python3-anyio
+      self.connection_pool = httpcore.AsyncConnectionPool( ssl_context=self.ssl_context )
 
     return self
 
   async def __aexit__( self, exc_type, exc_value, traceback ):
+    if not self.connection_pool:
+      return
+
     await self.connection_pool.aclose()
     self.connection_pool = None
 
@@ -182,22 +186,19 @@ class CInP():
 
   async def _request( self, verb, uri, data=None, header_map=None, timeout=30, retry_count=0 ):
     if self.connection_pool is None:
-      raise Exception( 'Connection pool is not initialized, make sure to use "async with CInP(...) as client:"' )
+      raise RuntimeError( 'Connection pool is not initialized, make sure to use "async with CInP(...) as client:"' )
 
     last_exception = None
     for retry in range( 0, retry_count + 1 ):
       if retry > 0:
         logging.debug( 'cinp: retry "{0}" of "{1}" for request to "{2}"'.format( retry, retry_count, uri ) )
         if self.retry_event.is_set():
-          raise last_exception
+          raise RequestAborted( 'Request Aborted' ) from last_exception
 
         try:
           await asyncio.wait_for( self.retry_event.wait(), _backOffDelay( retry ) )
         except asyncio.TimeoutError:
           pass
-        else:
-          logging.debug( 'cinp: request aborted' )
-          raise Exception( 'Request Aborted' )
 
       try:
         return await self.__request( verb, uri, data, header_map, timeout )
@@ -231,6 +232,7 @@ class CInP():
 
     header_list = self.header_list + self.auth_header_list + _headerMapToList( header_map )
     url = '{0}{1}'.format( self.host, uri )
+    resp = None
     try:
       resp = await self.connection_pool.request( verb, url, content=data, headers=header_list, extensions={ 'timeout': { 'connect': timeout } } )
       http_code = resp.status
@@ -240,17 +242,17 @@ class CInP():
       logging.debug( 'cinp: got HTTP code "{0}"'.format( http_code ) )
 
       if http_code == 401:
-        resp.close()
+        await resp.aclose()
         logging.warning( 'cinp: Invalid Session' )
         raise InvalidSession()
 
       if http_code == 403:
-        resp.close()
+        await resp.aclose()
         logging.warning( 'cinp: Not Authorized' )
         raise NotAuthorized()
 
       if http_code == 404:
-        resp.close()
+        await resp.aclose()
         logging.warning( 'cinp: Not Found' )
         raise NotFound()
 
@@ -266,19 +268,23 @@ class CInP():
             logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
             raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
 
-        header_map = { k: v for k, v in _headerListToMap( resp.headers ).items() if k in ( 'Position', 'Count', 'Total', 'Type', 'Multi-Object', 'Object-Id', 'verb' ) }
+      header_map = { k: v for k, v in _headerListToMap( resp.headers ).items() if k in ( 'Position', 'Count', 'Total', 'Type', 'Multi-Object', 'Object-Id', 'Verb' ) }
 
     except httpcore.ProtocolError as e:
-      raise Exception( ResponseError( 'ProtocolError "{0}"'.format( e ) ) )
+      raise ResponseError( 'ProtocolError "{0}"'.format( e ) )
 
     except httpcore.ProxyError as e:
-      raise Exception( ResponseError( 'ProxyError "{0}" for "{1}" via "{2}"'.format( e, url, self.proxy ) ) )
+      raise ResponseError( 'ProxyError "{0}" for "{1}" via "{2}"'.format( e, url, self.proxy ) )
 
     except httpcore.NetworkError as e:
       raise RetryableException( ResponseError( 'NetworkError "{0}"'.format( e ) ) )
 
     except httpcore.TimeoutException:
       raise RetryableException( Timeout( 'Request Timeout after {0} seconds'.format( timeout ) ) )
+
+    finally:
+      if resp is not None:
+        await resp.aclose()
 
     if http_code == 400:
       try:
@@ -310,18 +316,18 @@ class CInP():
 
   def setAuth( self, auth_id=None, auth_token=None ):
     """
-    Sets the Authencation id and token headers, call with out paramaters to remove the headers.
+    Sets the Authencation id and token headers, call without auth_id to remove the headers.
     """
-    logging.debug( 'cinp: removing auth info' )
-    self.auth_header_list = []
-
     if auth_id:
       logging.debug( 'cinp: setting auth info, id "{0}"'.format( auth_id ) )
       self.auth_header_list = _headerMapToList( { 'Auth-Id': auth_id, 'Auth-Token': auth_token } )
+    else:
+      logging.debug( 'cinp: removing auth info' )
+      self.auth_header_list = []
 
   async def describe( self, uri, timeout=30, retry_count=0 ):
     """
-    DESCRIE
+    DESCRIBE
     """
     logging.debug( 'cinp: DESCRIBE "{0}"'.format( uri ) )
     ( http_code, data, header_map ) = await self._request( 'DESCRIBE', uri, timeout=timeout, retry_count=retry_count )
@@ -343,9 +349,9 @@ class CInP():
       raise InvalidRequest( 'list filter_value_map must be a dict' )
 
     if not isinstance( position, int ) or not isinstance( count, int ) or position < 0 or count < 0:
-      raise InvalidRequest( 'position and count must bot be int and greater than 0' )
+      raise InvalidRequest( 'position and count must be an int and greater than or equal 0' )
 
-    header_map = { 'Position': str( position ), 'Count': str( count ) }  # TODO set position and coint to default to None, and don't send them if npt specified, rely on the server's defaults
+    header_map = { 'Position': str( position ), 'Count': str( count ) }  # TODO set position and count to default to None, and don't send them if npt specified, rely on the server's defaults
     if filter_name is not None:
       header_map[ 'Filter' ] = filter_name
 
@@ -361,7 +367,7 @@ class CInP():
       raise ResponseError( 'Response id_list must be a list for LIST' )
 
     count_map = { 'position': 0, 'count': 0, 'total': 0 }
-    for item in ( 'Position', 'Count', 'Total' ):  # NOTE HTTP Headers typicaly are CamelCase, but we want lower case for our count dictomary
+    for item in ( 'Position', 'Count', 'Total' ):  # NOTE HTTP Headers typicaly are CamelCase, but we want lower case for our count dictionary
       try:
         count_map[ item.lower() ] = int( header_map[ item ] )
       except ( KeyError, ValueError ):
@@ -375,7 +381,7 @@ class CInP():
     """
     header_map = {}
     if force_multi_mode:
-      header_map[ 'Multi-Object' ] = True
+      header_map[ 'Multi-Object' ] = 'True'
 
     logging.debug( 'cinp: GET "{0}"'.format( uri ) )
     ( http_code, rec_values, header_map ) = await self._request( 'GET', uri, header_map=header_map, timeout=timeout, retry_count=retry_count )
@@ -424,7 +430,7 @@ class CInP():
 
     header_map = {}
     if force_multi_mode:
-      header_map[ 'Multi-Object' ] = True
+      header_map[ 'Multi-Object' ] = 'True'
 
     logging.debug( 'cinp: UPDATE "{0}"'.format( uri ) )
     ( http_code, rec_values, _ ) = await self._request( 'UPDATE', uri, data=values, header_map=header_map, timeout=timeout, retry_count=retry_count )
@@ -435,7 +441,7 @@ class CInP():
 
     if not isinstance( rec_values, dict ):
       logging.warning( 'cinp: Response rec_values must be a dict for UPDATE' )
-      raise ResponseError( 'Response rec_values must be a str for UPDATE' )
+      raise ResponseError( 'Response rec_values must be a dict for UPDATE' )
 
     return rec_values
 
@@ -461,7 +467,7 @@ class CInP():
 
     header_map = {}
     if force_multi_mode:
-      header_map[ 'Multi-Object' ] = True
+      header_map[ 'Multi-Object' ] = 'True'
 
     logging.debug( 'cinp: CALL "{0}"'.format( uri ) )
     ( http_code, return_value, _ ) = await self._request( 'CALL', uri, data=args, header_map=header_map, timeout=timeout, retry_count=retry_count )
@@ -474,7 +480,7 @@ class CInP():
 
   async def getMulti( self, uri, id_list=None, chunk_size=10, retry_count=0 ):
     """
-    returns a generator that will iterate over the uri/id_list, reterieving from the server in chunk_size blocks
+    returns a generator that will iterate over the uri/id_list, retrieving from the server in chunk_size blocks
     each item is ( rec_id, rec_values )
     if uri is a list, id_list is ignored
     """
@@ -482,13 +488,16 @@ class CInP():
       id_list = []
       for item in uri:
         ( _, _, _, tmp_id_list, _ ) = self.uri.split( item )
-        id_list += tmp_id_list
+        if tmp_id_list:
+          id_list += tmp_id_list
 
-      ( namespace, model, _, tmp_id_list, _ ) = self.uri.split( uri[0] )
+      ( namespace, model, _, _, _ ) = self.uri.split( uri[0] )
 
     else:
       ( namespace, model, _, tmp_id_list, _ ) = self.uri.split( uri )
       if id_list is None:
+        if not tmp_id_list:
+          tmp_id_list = []
         id_list = tmp_id_list
 
     result_list = []
@@ -511,7 +520,9 @@ class CInP():
       id_list = self.uri.extractIds( tmp_id_list )
       pos = count_map[ 'position' ] + count_map[ 'count' ]
       total = count_map[ 'total' ]
-      return self.getMulti( uri, id_list, get_chunk_size, retry_count=retry_count )  # TODO: need to found out how to get the next chunk, return/yeild something
+
+      async for item in self.getMulti( uri, id_list, get_chunk_size, retry_count=retry_count ):
+        yield item
 
   async def getFilteredURIs( self, uri, filter_name=None, filter_value_map=None, list_chunk_size=100, get_chunk_size=10, timeout=30, retry_count=0 ):
     pos = 0
@@ -525,20 +536,31 @@ class CInP():
       while len( id_list ) > 0:
         yield id_list.pop( 0 )
 
-  async def getFile( self, uri, target_dir='/tmp', file_object=None, cb=None, timeout=30, chunk_size=( 4096 * 1024 ) ):
+  async def getFile( self, uri, target_dir='/tmp', file_object=None, cb=None, timeout=30 ):
     """
-    if file_object is defined:
-       The file contense are written to it and the filename as specified by the
-       server is returned, None is returned if not filename is detected.  The
-       file_object is not closed. file_object must be opened with the 'b' attribute.
+    Download a file from the server.
 
-    Otherwise a file is created in target_dir, and the full path is returned.  If the
-      filename is not specified by the server, and a random filename is chosen.
-      WARNING: there isn't checking done to make sure the target file does not allready
-      exist, there is a possibility it could clober something that allready exists.
-      we do make sure the filename fits a regex pattern that prevents it from escaping
-      the target_dir.  The "filename" as sent by the server is the "model" of the uri.
-      make sure target_dir exists before calling getFile
+    target_dir   — directory to write into when file_object is None. Must exist; not created.
+    file_object  — if provided, the file is written to it (must be opened in binary mode)
+                   and the server-supplied filename is returned, or None if the URI had no
+                   filename segment. file_object is not closed by this function.
+    cb           — optional progress callback, invoked as cb(bytes_written, total_size).
+                   Exceptions raised by cb are swallowed.
+    timeout      — connect timeout, seconds.
+
+    When file_object is None:
+      - If the URI carries a filename, the file is written to
+        os.path.join(target_dir, filename) and that path is returned. A leading '.'
+        is stripped from the filename to keep it inside target_dir; the URI parser
+        already restricts the filename character set so it cannot contain a path
+        separator. WARNING: this branch will clobber an existing file of the same
+        name without warning.
+      - If the URI carries no filename, a unique tempfile is created in target_dir
+        via NamedTemporaryFile(delete=False) and its full path is returned. No
+        clobber risk in this branch.
+
+    Raises InvalidRequest (bad URI / bad filename), ResponseError (non-200 or
+    network), Timeout.
     """
 
     uri_parser = URI( '/' )
@@ -547,7 +569,7 @@ class CInP():
     except ValueError as e:
       raise InvalidRequest( str( e ) )
 
-    # Due to the return value we have to do our own request, this is pretty much a stright GET
+    # Due to the return value we have to do our own request, this is pretty much a straight GET
     url = '{0}{1}'.format( self.host, uri )
 
     try:
@@ -569,17 +591,24 @@ class CInP():
 
         else:
           if filename is None:
-            file_writer = NamedTemporaryFile( dir=target_dir, mode='wb' )
+            file_writer = NamedTemporaryFile( dir=target_dir, mode='wb', delete=False )
             filename = file_writer.name
 
           else:
+            filename = filename.lstrip( '.' )  # remove any leading '.' to prevent path traversal
+            if not filename:
+              raise InvalidRequest( 'Bad file name' )
+
             filename = os.path.join( target_dir, filename )
             file_writer = open( filename, 'wb' )
 
         async for buff in resp.iter_stream():
           file_writer.write( buff )
           if cb:
-            cb( file_writer.tell(), size )
+            try:
+              cb( file_writer.tell(), size )
+            except Exception:  # this is just informational, if it is throwing stuff, just ignore it.
+              pass
 
     except httpcore.ProtocolError as e:
       raise ResponseError( 'ProtocolError "{0}"'.format( e ) )
@@ -604,7 +633,7 @@ class CInP():
     either specify the filename or make sure your file object exposes the attribute
     'name'.  Also if file object, must be opened in binary mode, ie: 'rb'
 
-    NOTE: this is not a CInP function, but a conviance function for uploading large files.
+    NOTE: this is not a CInP function, but a convenience function for uploading large files.
     """
     uri_parser = URI( '/' )
     try:  # TODO: There has to be a better way to validate this uri
@@ -628,7 +657,7 @@ class CInP():
       file_reader = _readerWrapper( filepath, cb )
 
     header_map = {
-                   'Content-Disposition': 'inline: filename="{0}"'.format( filename ),
+                   'Content-Disposition': 'inline; filename="{0}"'.format( filename ),
                    'Content-Length': len( file_reader )
                  }
 

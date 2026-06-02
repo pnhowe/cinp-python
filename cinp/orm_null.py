@@ -1,35 +1,35 @@
 import re
-from cinp.server_common import Converter, Namespace, Model, Action, Paramater, checkAuth_true, checkAuth_false
+from cinp.server_common import Converter, Namespace, Model, Action, Parameter, checkAuth_true, checkAuth_false
 
 
-def paramater_type_to_kwargs( paramater_type ):
+def parameter_type_to_kwargs( parameter_type ):
   result = {}
 
-  if isinstance( paramater_type, dict ):
-    result[ 'type' ] = paramater_type[ 'type' ]
+  if isinstance( parameter_type, dict ):
+    result[ 'type' ] = parameter_type[ 'type' ]
 
     try:
-      result[ 'doc' ] = paramater_type[ 'doc' ]
+      result[ 'doc' ] = parameter_type[ 'doc' ]
     except KeyError:
       pass
 
     try:
-      result[ 'length' ] = paramater_type[ 'length' ]
+      result[ 'length' ] = parameter_type[ 'length' ]
     except KeyError:
       pass
 
     try:
-      result[ 'is_array' ] = paramater_type[ 'is_array' ]
+      result[ 'is_array' ] = parameter_type[ 'is_array' ]
     except KeyError:
       pass
 
     try:
-      result[ 'allowed_scheme_list' ] = paramater_type[ 'allowed_scheme_list' ]
+      result[ 'allowed_scheme_list' ] = parameter_type[ 'allowed_scheme_list' ]
     except KeyError:
       pass
 
   else:
-    result[ 'type' ] = paramater_type
+    result[ 'type' ] = parameter_type
 
   return result
 
@@ -69,7 +69,7 @@ class NullCInP():
 
     return namespace
 
-  def model( self, cache_length=3600 ):
+  def model( self ):
     def decorator( cls ):
 
       name = cls.__qualname__
@@ -80,7 +80,7 @@ class NullCInP():
 
     return decorator
 
-  def action( self, return_type=None, paramater_type_list=None ):  # must decorate the @staticmethod decorator to detect if it is static or not
+  def action( self, return_type=None, parameter_type_list=None ):  # must decorate the @staticmethod decorator to detect if it is static or not
     def decorator( func ):
       if type( func ).__name__ == 'staticmethod':
         static = True
@@ -88,39 +88,39 @@ class NullCInP():
       else:
         raise ValueError( 'action must be a staticmethod' )
 
-      paramater_type_list_ = paramater_type_list or []
+      parameter_type_list_ = parameter_type_list or []
       ( model_name, name ) = func.__qualname__.split( '.' )
       if model_name not in self.action_map:
         self.action_map[ model_name ] = []
 
       if static:
-        paramater_name_list = func.__code__.co_varnames[ 0:func.__code__.co_argcount ]
+        parameter_name_list = func.__code__.co_varnames[ 0:func.__code__.co_argcount ]
       else:
-        paramater_name_list = func.__code__.co_varnames[ 1:func.__code__.co_argcount ]  # skip 'self'
+        parameter_name_list = func.__code__.co_varnames[ 1:func.__code__.co_argcount ]  # skip 'self'
 
       default_list = func.__defaults__
-      default_offset = len( paramater_name_list ) - len( default_list or [] )
+      default_offset = len( parameter_name_list ) - len( default_list or [] )
 
-      if len( paramater_name_list ) != len( paramater_type_list_ ):
-        raise ValueError( 'paramater_name_list({0}) is not the same length as paramater_type_list({1}) for "{2}" of "{3}"'.format( len( paramater_name_list ), len( paramater_type_list_ ), name, model_name ) )
+      if len( parameter_name_list ) != len( parameter_type_list_ ):
+        raise ValueError( 'parameter_name_list({0}) is not the same length as parameter_type_list({1}) for "{2}" of "{3}"'.format( len( parameter_name_list ), len( parameter_type_list_ ), name, model_name ) )
 
-      paramater_list = []
-      for index in range( 0, len( paramater_type_list_ ) ):
-        kwargs = paramater_type_to_kwargs( paramater_type_list_[ index ] )
-        kwargs[ 'name' ] = paramater_name_list[ index ]
+      parameter_list = []
+      for index in range( 0, len( parameter_type_list_ ) ):
+        kwargs = parameter_type_to_kwargs( parameter_type_list_[ index ] )
+        kwargs[ 'name' ] = parameter_name_list[ index ]
         if index >= default_offset:
           kwargs[ 'default' ] = default_list[ index - default_offset ]
 
-        paramater_list.append( Paramater( **kwargs ) )
+        parameter_list.append( Parameter( **kwargs ) )
 
-      return_paramater = Paramater( **paramater_type_to_kwargs( return_type ) )
+      return_parameter = Parameter( **parameter_type_to_kwargs( return_type ) )
 
       try:
         doc = func.__doc__.strip()
       except AttributeError:
         doc = ''
 
-      self.action_map[ model_name ].append( Action( name=name, doc=doc, func=func, return_paramater=return_paramater, paramater_list=paramater_list, static=static ) )
+      self.action_map[ model_name ].append( Action( name=name, doc=doc, func=func, return_parameter=return_parameter, parameter_list=parameter_list, static=static ) )
       return func
 
     return decorator

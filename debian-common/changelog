@@ -1,3 +1,10 @@
+cinp (2.0.0-1) DIST; urgency=medium
+
+  * Loads of fixes that were found by Claude
+  * there was some misspellings in the protocol, so version bump
+
+ -- Peter Howe <pnhowe@gmail.com>  Fri, 9 Jan 2026 18:06:13 -0600
+
 cinp (1.4.0-1) DIST; urgency=medium
 
   * should be fully async and context manager now
@@ -84,7 +91,7 @@ cinp (0.20.1-1) DIST; urgency=medium
 cinp (0.19.0-1) DIST; urgency=medium
 
   * Updates for Django 2.x
-  * Django pre 1.8 no longer supported 
+  * Django pre 1.8 no longer supported
 
  -- Peter Howe <pnhowe@gmail.com>  Sat, 09 Jan 2021 11:33:07 -0700
 

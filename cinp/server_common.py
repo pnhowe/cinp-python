@@ -2,17 +2,18 @@ import traceback
 import json
 import copy
 import sys
+import uuid
 from dateutil import parser as datetimeparser
 from urllib import parse
 
 from cinp.common import URI, doccstring_prep
 from cinp.readers import READER_REGISTRY
 
-__CINP_VERSION__ = '1.0'
+__CINP_VERSION__ = '2.0'
 __MULTI_URI_MAX__ = 100
 
 FIELD_TYPE_LIST = ( 'String', 'Integer', 'Float', 'Boolean', 'DateTime', 'Map', 'Model', 'File' )
-FILTER_OPERATION_LIST = ( '=', '!=', '<', '>', '<=', '>=', 'startswith', 'endswith', 'contains' )  # I wonder how much work it would be to do "in", also "null" and "notnull" and/or blank?
+FILTER_OPERATION_LIST = ( '=', '<', '>', '<=', '>=', 'startswith', 'endswith', 'contains' )  # I wonder how much work it would be to do "in", also "null" and "notnull" and/or blank?
 
 
 class Notset:
@@ -26,7 +27,7 @@ notset = Notset()
 class InvalidRequest( Exception ):  # TODO: look for all the catch ValueError that might be a ValueError with data/response_data, there seems to be three ways of dealing with ValueError, needs to be cleaned up
   def __init__( self, message=None, data=None ):
     try:
-      self.data = message.response_data
+      self.data = message.response_data  # response_data can be defined as a property by child class
     except AttributeError:
       self.data = data or { 'message': str( message ) }
 
@@ -74,34 +75,66 @@ class AnonymousUser():
     return True
 
 
+# use this checkAuth function to deny all auth checks
 def checkAuth_false( * args ):
   return False
 
 
+# use this checkAuth function to approve all auth checks
 def checkAuth_true( * args ):
   return True
 
 
-def _debugDump( location, request, exception ):
+class _NonClosingWriter:
+  # wraps a shared stream (eg: sys.stdout) so leaving a 'with' block does not close it
+  def __init__( self, stream ):
+    self._stream = stream
+
+  def __enter__( self ):
+    return self._stream
+
+  def __exit__( self, exc_type, exc_value, traceback ):
+    return False
+
+
+def _getDebugWriter( location ):
   import os
-  from datetime import datetime
+  from datetime import datetime, timezone
 
   try:
     if location == '*CONSOLE*':
-      fp = sys.stdout
+      return _NonClosingWriter( sys.stdout )
     else:
-      fp = open( os.path.join( location, datetime.utcnow().isoformat() ), 'w' )
-
-    fp.write( '** Request **\n' )
-    fp.write( str( request ) )
-    fp.write( '\n\n** Stack **\n' )
-    traceback.print_exception( None, exception, exception.__traceback__, file=fp )
-
-    if fp is not sys.stdout:
-      fp.close()
+      return open( os.path.join( location, datetime.now( timezone.utc ).strftime( '%Y%m%dT%H%M%S.%fZ' ) ), 'w' )
 
   except Exception as e:
     sys.stderr.write( 'Error "{0}" when writing the debug dump'.format( e ) )
+
+  return None
+
+
+def _debugDump( location, request, exception, id, auth_header_list=None, auth_cookie_list=None ):
+  writer = _getDebugWriter( location )
+  if writer is None:
+    return
+
+  # WerkzeugRequest upper-cases header keys, so match the auth header names case-insensitively.
+  # NOTE: request.data (the parsed body) may still contain sensitive fields (eg: passwords on a
+  # CREATE/UPDATE, tokens in a CALL) — restrict filesystem permissions on the dump location.
+  auth_headers = { h.upper() for h in auth_header_list or [] }
+  auth_cookies = set( auth_cookie_list or [] )
+
+  headers = { k: ( '<REDACTED>' if k.upper() in auth_headers else v )
+              for k, v in request.header_map.items() }
+  cookies = { k: ( '<REDACTED>' if k in auth_cookies else v )
+              for k, v in ( request.cookie_map or {} ).items() }
+
+  with writer as fp:
+    fp.write( '** id: {0}\n'.format( id ) )
+    fp.write( '** Request **\n' )
+    fp.write( 'Verb: "{0}"\n  URI: "{1}"\n  Header Map: "{2}"\n  Cookie Map: "{3}"\n  Data: "{4}"'.format( request.verb, request.uri, headers, cookies, request.data ) )
+    fp.write( '\n\n** Stack **\n' )
+    traceback.print_exception( None, exception, exception.__traceback__, file=fp )
 
 
 def _fromPythonMap_converter( value ):
@@ -122,10 +155,9 @@ def _fromPythonList( value ):
 
 
 def _fromPythonMap( value ):
-  for key in value.keys():
+  for key in list( value.keys() ):
     if not isinstance( key, str ):
       new_key = str( _fromPythonMap_converter( key ) )  # some types still convert to non-strings(int, float, etc.), JSON requires string
-      assert new_key != key  # if they are the same, bad things happen
       value[ new_key ] = value[ key ]
       del value[ key ]
       key = new_key
@@ -163,18 +195,18 @@ class Converter():
     super().__init__()
     self.uri = uri
 
-  def _toPython( self, paramater, cinp_value, transaction ):
-    if paramater.type == 'String':
+  def _toPython( self, parameter, cinp_value, transaction ):
+    if parameter.type == 'String':
       if cinp_value is None:
         return None
 
       cinp_value = str( cinp_value )
-      if paramater.length is not None and len( cinp_value ) > paramater.length:
-        raise ValueError( 'Value to long' )
+      if parameter.length is not None and len( cinp_value ) > parameter.length:
+        raise ValueError( 'Value too long' )
 
       return cinp_value
 
-    if paramater.type == 'Integer':
+    if parameter.type == 'Integer':
       if cinp_value is None or cinp_value == '':
         return None
 
@@ -183,7 +215,7 @@ class Converter():
       except ( TypeError, ValueError ):
         raise ValueError( 'Unable to convert to an int' )
 
-    if paramater.type == 'Float':
+    if parameter.type == 'Float':
       if cinp_value is None or cinp_value == '':
         return None
 
@@ -192,7 +224,7 @@ class Converter():
       except ( TypeError, ValueError ):
         raise ValueError( 'Unable to convert to an float' )
 
-    if paramater.type == 'Boolean':
+    if parameter.type == 'Boolean':
       if cinp_value is None or cinp_value == '':
         return None
 
@@ -209,16 +241,16 @@ class Converter():
 
       raise ValueError( 'Unable to convert to boolean' )
 
-    if paramater.type == 'DateTime':
+    if parameter.type == 'DateTime':
       if cinp_value is None or cinp_value == '':
         return None
 
       try:
         return datetimeparser.parse( cinp_value )
-      except ( AttributeError, ValueError ):
-        raise ValueError( 'DateUtil value must be a string in a format dateutil can understand' )
+      except ( AttributeError, ValueError, KeyError, OverflowError ):
+        raise ValueError( 'DateTime value must be a string in a format dateutil can understand' )
 
-    if paramater.type == 'Map':
+    if parameter.type == 'Map':
       if cinp_value is None or cinp_value == '':
         return {}
 
@@ -227,25 +259,25 @@ class Converter():
 
       return cinp_value
 
-    if paramater.type == 'Model':
+    if parameter.type == 'Model':
       if cinp_value is None or cinp_value == '':
         return None
 
       if not isinstance( cinp_value, str ):
-        raise ValueError( 'Model refrence must be a string uri' )
+        raise ValueError( 'Model reference must be a string uri' )
 
       ( path, model, action, id_list, multi ) = self.uri.split( cinp_value )
 
-      if self.uri.build( path, model ) != paramater.model.path:
-        raise ValueError( 'Object "{0}" is for a model other than "{1}"'.format( cinp_value, paramater.model.path )  )
+      if self.uri.build( path, model ) != parameter.model.path:
+        raise ValueError( 'Object "{0}" is for a model other than "{1}"'.format( cinp_value, parameter.model.path )  )
 
-      result = transaction.get( paramater.model, id_list[0] )   # TODO: handle multi id id_lists right
+      result = transaction.get( parameter.model, id_list[0] )   # TODO: handle multi id id_lists right
       if result is None:
-        raise ValueError( 'Object "{0}" for model "{1}" NotFound'.format( cinp_value, paramater.model.path ) )
+        raise ValueError( 'Object "{0}" for model "{1}" NotFound'.format( cinp_value, parameter.model.path ) )
 
       return result
 
-    if paramater.type == 'File':
+    if parameter.type == 'File':
       if cinp_value is None or cinp_value == '':
         return None
 
@@ -253,7 +285,7 @@ class Converter():
 
       reader = READER_REGISTRY.get( scheme, None )
 
-      if reader is None or scheme not in paramater.allowed_scheme_list:
+      if reader is None or scheme not in parameter.allowed_scheme_list:
         raise ValueError( 'Unknown or Invalid scheme "{0}"'.format( scheme ) )
 
       ( file_reader, filename ) = reader( cinp_value )
@@ -261,26 +293,26 @@ class Converter():
 
       return ( file_reader, filename )
 
-    raise Exception( 'Unknown type "{0}"'.format( self.type ) )
+    raise TypeError( 'Unknown type "{0}"'.format( parameter.type ) )
 
-  def _fromPython( self, paramater, python_value ):
-    if paramater.type == 'String':
+  def _fromPython( self, parameter, python_value ):
+    if parameter.type == 'String':
       if python_value is None:
         return None
 
       python_value = str( python_value )
-      if paramater.length is not None and len( python_value ) > paramater.length:
+      if parameter.length is not None and len( python_value ) > parameter.length:
         raise ValueError( 'String value to long' )
 
       return str( python_value )
 
-    if paramater.type == 'Boolean':
+    if parameter.type == 'Boolean':
       if python_value is None:
         return None
 
       return python_value
 
-    if paramater.type == 'Integer':
+    if parameter.type == 'Integer':
       if python_value is None:
         return None
 
@@ -289,7 +321,7 @@ class Converter():
       except ( TypeError, ValueError ):
         raise ValueError( 'Invalid int' )
 
-    if paramater.type == 'Float':
+    if parameter.type == 'Float':
       if python_value is None:
         return None
 
@@ -298,13 +330,13 @@ class Converter():
       except ( TypeError, ValueError ):
         raise ValueError( 'Invalid float' )
 
-    if paramater.type == 'DateTime':
+    if parameter.type == 'DateTime':
       if python_value is None:
         return None
 
       return python_value.isoformat()
 
-    if paramater.type == 'Map':
+    if parameter.type == 'Map':
       if python_value is None:
         return None
 
@@ -316,60 +348,66 @@ class Converter():
 
       return result
 
-    if paramater.type == 'Model':
-      raise Exception( 'Unimplemented' )
+    if parameter.type == 'Model':
+      raise NotImplementedError( 'Unimplemented' )
 
-    if paramater.type == 'File':
-      raise Exception( 'Unimplemented' )
+    if parameter.type == 'File':
+      raise NotImplementedError( 'Unimplemented' )
 
-    raise Exception( 'Unknown type "{0}"'.format( self.type ) )
+    raise TypeError( 'Unknown type "{0}"'.format( parameter.type ) )
 
-  def toPython( self, paramater, cinp_value, transaction ):
-    if paramater.type is None:
+  def toPython( self, parameter, cinp_value, transaction ):
+    # KeyError is reserved for callers to detect a parameter missing from the request
+    # data, so any KeyError raised during conversion is re-raised as a ServerError
+    try:
+      if parameter.type is None:
+        return None
+
+      if parameter.is_array:
+        if cinp_value is None or cinp_value == '':
+          return []
+
+        if not isinstance( cinp_value, list ):
+          raise ValueError( 'Must be an Array/List, got "{0}"'.format( type( cinp_value ).__name__ ) )
+
+        result = []
+        for value in cinp_value:
+          result.append( self._toPython( parameter, value, transaction ) )
+
+        return result
+
+      else:
+        return self._toPython( parameter, cinp_value, transaction )
+
+    except KeyError as e:
+      raise ServerError( 'Unexpected KeyError converting value for parameter "{0}": {1}'.format( parameter.name, e ) )
+
+  def fromPython( self, parameter, python_value ):
+    if parameter.type is None:
       return None
 
-    if paramater.is_array:
-      if cinp_value is None or cinp_value == '':
-        return []
-
-      if not isinstance( cinp_value, list ):
-        raise ValueError( 'Must be an Array/List, got "{0}"'.format( type( cinp_value ).__name__ ) )
-
-      result = []
-      for value in cinp_value:
-        result.append( self._toPython( paramater, value, transaction ) )
-
-      return result
-
-    else:
-      return self._toPython( paramater, cinp_value, transaction )
-
-  def fromPython( self, paramater, python_value ):
-    if paramater.type is None:
-      return None
-
-    if paramater.is_array:
+    if parameter.is_array:
       if python_value is None:
         return []
 
       result = []
-      if paramater.type == 'Model':
-        if hasattr( python_value, 'all' ):  # ie: is QueryString or a ManyRelatedManager or simaler
+      if parameter.type == 'Model':
+        if hasattr( python_value, 'all' ):  # ie: is QueryString or a ManyRelatedManager or similar
           python_value = list( python_value.all() )  # django specific again, and really should only get the pk
 
       if not isinstance( python_value, list ):
         raise ValueError( 'Must be an Array/List, got "{0}"'.format( type( python_value ).__name__ ) )
 
       for value in python_value:
-        result.append( self._fromPython( paramater, value ) )
+        result.append( self._fromPython( parameter, value ) )
 
       return result
 
     else:
-      return self._fromPython( paramater, python_value )
+      return self._fromPython( parameter, python_value )
 
 
-class Paramater():
+class Parameter():
   def __init__( self, type, name=None, is_array=False, doc=None, length=None, model=None, model_resolve=None, choice_list=None, default=notset, allowed_scheme_list=None ):
     super().__init__()
     self.name = name
@@ -386,7 +424,7 @@ class Paramater():
 
       elif type == 'Model':
         if model is None:
-          raise ValueError( 'model is requred for Model type' )
+          raise ValueError( 'model is required for Model type' )
 
         if not isinstance( model, Model ):
           if model_resolve is None:
@@ -435,7 +473,7 @@ class Paramater():
     return result
 
 
-class Field( Paramater ):
+class Field( Parameter ):
   def __init__( self, mode='RW', required=True, *args, **kwargs ):
     if mode not in ( 'RW', 'RC', 'RO' ):
       raise ValueError( 'Mode must be RW, RC, or RO' )
@@ -452,10 +490,10 @@ class Field( Paramater ):
     return result
 
 
-class FilterParamater( Paramater ):
+class FilterParameter( Parameter ):
   def __init__( self, allowed_operations=None, *args, **kwargs ):
     if allowed_operations is not None and set( allowed_operations ) - set( FILTER_OPERATION_LIST ):
-      raise ValueError( 'Mode must a set of "{0}"'.format( FILTER_OPERATION_LIST ) )
+      raise ValueError( 'allowed_operations must a set of "{0}"'.format( FILTER_OPERATION_LIST ) )
 
     super().__init__( *args, **kwargs )
     self.allowed_operations = allowed_operations
@@ -515,7 +553,7 @@ class Element():
 
   @staticmethod
   def checkAuth( user, verb, id_list ):
-    raise ValueError( 'checkAuth not implemented' )
+    raise NotImplementedError( 'checkAuth not implemented' )
 
 
 class Namespace( Element ):
@@ -614,7 +652,7 @@ class Model( Element ):
       self.field_map[ field.name ] = field
 
     self.action_map = {}
-    self.list_filter_map = list_filter_map or {}  # TODO: check list_filter_map  for  saninty, should  be [ filter_name ][ paramater_name ] = Paramater
+    self.list_filter_map = list_filter_map or {}  # TODO: check list_filter_map  for  sanity, should  be [ filter_name ][ parameter_name ] = Parameter
     self.list_query_filter_map = list_query_filter_map or {}  # TODO: check this too
     self.list_query_sort_list = list_query_sort_list or []
     self.constant_set_map = constant_set_map or {}
@@ -690,7 +728,7 @@ class Model( Element ):
     result = {}
     for field_name in self.field_map:
       try:
-        result[ field_name ] = converter.fromPython( self.field_map[ field_name ], getattr( target_object, field_name ) )  # TODO: disguinsh between the AttributeError of looking up the field, and any errors pulling the field value might cause
+        result[ field_name ] = converter.fromPython( self.field_map[ field_name ], getattr( target_object, field_name ) )  # TODO: distinguish between the AttributeError of looking up the field, and any errors pulling the field value might cause
       except ValueError as e:
         raise ValueError( 'Error with "{0}": "{1}"'.format( field_name, e ) )
       except AttributeError:
@@ -737,7 +775,7 @@ class Model( Element ):
 
     if filter_name is not None:
       if data is None:
-        raise InvalidRequest( 'Filter Paramaters are required when Filter Name is specified' )
+        raise InvalidRequest( 'Filter Parameters are required when Filter Name is specified' )
 
       error_map = {}
       if filter_name == '_query_':
@@ -753,7 +791,7 @@ class Model( Element ):
           if not isinstance( entry, str ):
             raise InvalidRequest( data={ 'sort': 'All Sort Fields must be a string' } )
 
-          sort_reversed = len( entry ) > 2 and entry[0] == '~'
+          sort_reversed = len( entry ) >= 2 and entry[0] == '~'
 
           if ( sort_reversed or entry not in self.list_query_sort_list ) and ( not sort_reversed or entry[ 1: ] not in self.list_query_sort_list ):
             raise InvalidRequest( data={ 'sort': 'Invalid Filter Sort Field: "{0}"'.format( entry ) } )
@@ -762,18 +800,18 @@ class Model( Element ):
 
       else:
         try:
-          paramater_map = self.list_filter_map[ filter_name ]
+          parameter_map = self.list_filter_map[ filter_name ]
         except KeyError:
           raise InvalidRequest( 'Invalid Filter Name "{0}"'.format( filter_name ) )
 
-        for paramater_name in paramater_map:
-          paramater = paramater_map[ paramater_name ]
+        for parameter_name in parameter_map:
+          parameter = parameter_map[ parameter_name ]
           try:
-            filter_values[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
+            filter_values[ parameter_name ] = converter.toPython( parameter, data[ parameter_name ], transaction )
           except ValueError as e:
-            error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( e )
+            error_map[ parameter_name ] = 'Invalid Value "{0}"'.format( e )
           except KeyError:
-            error_map[ paramater_name ] = 'Required Paramater'
+            error_map[ parameter_name ] = 'Required Parameter'
 
       if error_map != {}:
         raise InvalidRequest( data=error_map )
@@ -786,7 +824,7 @@ class Model( Element ):
       else:
         raise InvalidRequest( e )
 
-    if result is None or ( not isinstance( result, tuple ) and len( result ) != 3 ):
+    if result is None or not isinstance( result, tuple ) or len( result ) != 3:
       raise ServerError( 'List result is not a valid tuple' )
 
     ( id_list, position, total ) = result
@@ -797,7 +835,10 @@ class Model( Element ):
 
     return Response( 200, data=id_list, header_map={ 'Verb': 'LIST', 'Cache-Control': 'no-cache', 'Count': str( len( id_list ) ), 'Position': str( position ), 'Total': str( total ), 'Id-Only': str( id_only ) } )
 
-  def _filterConvert( self, filter_spec_map, paramater_map, converter, transaction ):
+  def _filterConvert( self, filter_spec_map, parameter_map, converter, transaction, depth=0 ):
+    if depth >= 20:
+      return {}, [ 'To many boolean operator levels' ]
+
     if not filter_spec_map:
       return {}, []
 
@@ -813,7 +854,7 @@ class Model( Element ):
       if operation not in FILTER_OPERATION_LIST:
         return {}, [ 'Invalid Filter Operation: "{0}"'.format( operation ) ]
 
-      allowed_operation_list = paramater_map[ field ].allowed_operations
+      allowed_operation_list = parameter_map[ field ].allowed_operations
       if allowed_operation_list is not None and operation not in allowed_operation_list:
         return {}, [ 'Not Allowed Filter Operation: "{0}"'.format( operation ) ]
 
@@ -823,7 +864,7 @@ class Model( Element ):
         return {}, [ 'Value Must be Specified for Filtering Entries' ]
 
       try:
-        value = converter.toPython( paramater_map[ field ], value, transaction )
+        value = converter.toPython( parameter_map[ field ], value, transaction )
       except ValueError as e:
         return {}, [ 'Invalid Value "{0}" for field "{1}"'.format( e, field ) ]
 
@@ -836,15 +877,15 @@ class Model( Element ):
       right = filter_spec_map.get( 'right', None )
       left = filter_spec_map.get( 'left', None )
       if operation == 'not' and right is not None:
-        right, right_error_list = self._filterConvert( right, paramater_map, converter, transaction )
+        right, right_error_list = self._filterConvert( right, parameter_map, converter, transaction, depth + 1 )
         return { 'operation': 'not', 'right': right }, right_error_list
 
       if operation in ( 'or', 'and' ) and left is not None and right is not None:
-        left, left_error_list = self._filterConvert( left, paramater_map, converter, transaction )
-        right, right_error_list = self._filterConvert( right, paramater_map, converter, transaction )
+        left, left_error_list = self._filterConvert( left, parameter_map, converter, transaction, depth + 1 )
+        right, right_error_list = self._filterConvert( right, parameter_map, converter, transaction, depth + 1 )
         return { 'operation': operation, 'left': left, 'right': right }, left_error_list + right_error_list
 
-      return {}, [ 'Unknown/Invalid Operation and Paramaters: "{0}", Right is none: {1}, Left is none: {2}'.format( operation, right is None, left is None ) ]
+      return {}, [ 'Unknown/Invalid Operation and Parameters: "{0}", Right is none: {1}, Left is none: {2}'.format( operation, right is None, left is None ) ]
 
     return {}, [ 'Operation and/or Field not Defined' ]
 
@@ -901,7 +942,7 @@ class Model( Element ):
       else:
         raise InvalidRequest( e )
 
-    if not isinstance( result, tuple ) and len( result ) != 2:
+    if not isinstance( result, tuple ) or len( result ) != 2:
       raise ServerError( 'Create result is not a valid tuple' )
 
     ( object_id, result ) = result
@@ -987,24 +1028,24 @@ class Model( Element ):
 
 
 class Action( Element ):
-  def __init__( self, func, return_paramater=None, paramater_list=None, static=True, *args, **kwargs ):
-    if return_paramater is not None and not isinstance( return_paramater, Paramater ):
-      raise ValueError( 'return_paramater must be a Paramater' )
+  def __init__( self, func, return_parameter=None, parameter_list=None, static=True, *args, **kwargs ):
+    if return_parameter is not None and not isinstance( return_parameter, Parameter ):
+      raise ValueError( 'return_parameter must be a Parameter' )
 
     super().__init__( *args, **kwargs )
     self.func = func
-    self.paramater_map = {}
-    for paramater in paramater_list or []:
-      if not isinstance( paramater, Paramater ):
-        raise ValueError( 'paramater must be of type Paramater' )
+    self.parameter_map = {}
+    for parameter in parameter_list or []:
+      if not isinstance( parameter, Parameter ):
+        raise ValueError( 'parameter must be of type Parameter' )
 
-      self.paramater_map[ paramater.name ] = paramater
+      self.parameter_map[ parameter.name ] = parameter
 
-    if return_paramater is None:
-      self.return_paramater = Paramater( name=None, type=None )
+    if return_parameter is None:
+      self.return_parameter = Parameter( name=None, type=None )
     else:
-      return_paramater.name = None
-      self.return_paramater = return_paramater
+      return_parameter.name = None
+      self.return_parameter = return_parameter
 
     self.static = static
 
@@ -1016,12 +1057,12 @@ class Action( Element ):
     return '{0}({1})'.format( self.parent.path, self.name )
 
   def describe( self, converter ):
-    return_type = self.return_paramater.describe( converter )
+    return_type = self.return_parameter.describe( converter )
     del return_type[ 'name' ]
     data = { 'name': self.name, 'path': self.path, 'return-type': return_type, 'static': self.static }
     if self.doc:
       data[ 'doc' ] = self.doc
-    data[ 'paramaters' ] = [ item.describe( converter ) for item in self.paramater_map.values() if item.type != '_USER_' ]
+    data[ 'parameters' ] = [ item.describe( converter ) for item in self.parameter_map.values() if item.type != '_USER_' ]
 
     return Response( 200, data=data, header_map={ 'Verb': 'DESCRIBE', 'Type': 'Action', 'Cache-Control': 'max-age=0' } )
 
@@ -1029,26 +1070,26 @@ class Action( Element ):
     #  TODO: deal with data when None, and in other places
     error_map = {}
     value_map = {}
-    for paramater_name in self.paramater_map:  # should we be ignorning data?
-      paramater = self.paramater_map[ paramater_name ]
-      if paramater.type == '_USER_':
-        value_map[ paramater_name ] = user
+    for parameter_name in self.parameter_map:  # should we be ignoring data?
+      parameter = self.parameter_map[ parameter_name ]
+      if parameter.type == '_USER_':
+        value_map[ parameter_name ] = user
 
       else:
         try:
-          value_map[ paramater_name ] = converter.toPython( paramater, data[ paramater_name ], transaction )
+          value_map[ parameter_name ] = converter.toPython( parameter, data[ parameter_name ], transaction )
         except KeyError:
-          if paramater.default is not notset:
-            if callable( paramater.default ):
-              value_map[ paramater_name ] = paramater.default()
+          if parameter.default is not notset:
+            if callable( parameter.default ):
+              value_map[ parameter_name ] = parameter.default()
             else:
-              value_map[ paramater_name ] = paramater.default
+              value_map[ parameter_name ] = parameter.default
 
           else:
-            error_map[ paramater_name ] = 'Required Paramater'
+            error_map[ parameter_name ] = 'Required Parameter'
 
         except ValueError as e:
-          error_map[ paramater_name ] = 'Invalid Value "{0}"'.format( e )
+          error_map[ parameter_name ] = 'Invalid Value "{0}"'.format( e )
 
     if error_map != {}:
       raise InvalidRequest( data=error_map )
@@ -1069,11 +1110,11 @@ class Action( Element ):
               raise InvalidRequest( e )
 
           try:
-            result[ '{0}:{1}:'.format( self.parent.path, object_id ) ] = converter.fromPython( self.return_paramater, result_value )
+            result[ '{0}:{1}:'.format( self.parent.path, object_id ) ] = converter.fromPython( self.return_parameter, result_value )
           except ValueError as e:
             raise InvalidRequest( 'Invalid Result Value: "{0}"'.format( e ) )
       else:
-        result = converter.fromPython( self.return_paramater, self.func( self.parent._get( transaction, id_list[0] ), **value_map ) )
+        result = converter.fromPython( self.return_parameter, self.func( self.parent._get( transaction, id_list[0] ), **value_map ) )
 
     else:
       if not self.static:
@@ -1088,7 +1129,7 @@ class Action( Element ):
           raise InvalidRequest( e )
 
       try:
-        result = converter.fromPython( self.return_paramater, result_value )
+        result = converter.fromPython( self.return_parameter, result_value )
       except ValueError as e:
         raise InvalidRequest( 'Invalid Result Value: "{0}"'.format( e ) )
 
@@ -1102,16 +1143,15 @@ class Action( Element ):
 
 
 def defaultGetUser( cookie_map, header_map ):
-  if cookie_map or header_map:
-    raise ValueError( 'get_user not specified' )
-
-  else:
-    return AnonymousUser()
+  return AnonymousUser()
 
 
 class Server():
   def __init__( self, root_path, root_version, get_user=None, auth_header_list=None, auth_cookie_list=None, cors_allow_origin=None, debug=False, debug_dump_location=None ):
     super().__init__()
+    if get_user is None and ( auth_header_list or auth_cookie_list ):
+      raise ValueError( 'get_user is required when auth_header_list and/or auth_cookie_list is specified' )
+
     self.uri = URI( root_path )
     self.get_user = get_user or defaultGetUser
     self.auth_header_list = auth_header_list or []
@@ -1142,46 +1182,46 @@ class Server():
 
       for action_name in model.action_map:
         action = model.action_map[ action_name ]
-        if action.return_paramater.type == 'Model' and hasattr( action.return_paramater, 'model_resolve' ):
-          new_model = action.return_paramater.model_resolve( action.return_paramater.model )  # this is django specific again
-          del action.return_paramater.model_resolve
+        if action.return_parameter.type == 'Model' and hasattr( action.return_parameter, 'model_resolve' ):
+          new_model = action.return_parameter.model_resolve( action.return_parameter.model )  # this is django specific again
+          del action.return_parameter.model_resolve
           if not isinstance( new_model, Model ):
-            raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+            raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, action.return_parameter.model ) )
 
-          action.return_paramater.model = new_model
+          action.return_parameter.model = new_model
 
-        paramater_map = action.paramater_map
-        for paramater_name in paramater_map:
-          paramater = paramater_map[ paramater_name ]
-          if paramater.type == 'Model' and hasattr( paramater, 'model_resolve' ):
-            new_model = paramater.model_resolve( paramater.model )  # this is django specific again
-            del paramater.model_resolve
+        parameter_map = action.parameter_map
+        for parameter_name in parameter_map:
+          parameter = parameter_map[ parameter_name ]
+          if parameter.type == 'Model' and hasattr( parameter, 'model_resolve' ):
+            new_model = parameter.model_resolve( parameter.model )  # this is django specific again
+            del parameter.model_resolve
             if not isinstance( new_model, Model ):
-              raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+              raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, parameter.model ) )
 
-            paramater.model = new_model
+            parameter.model = new_model
 
       for filter_name in model.list_filter_map:
-        paramater_map = model.list_filter_map[ filter_name ]
-        for paramater_name in paramater_map:
-          paramater = paramater_map[ paramater_name ]
-          if paramater.type == 'Model' and hasattr( paramater, 'model_resolve' ):
-            new_model = paramater.model_resolve( paramater.model )  # this is django specific again
-            del paramater.model_resolve
+        parameter_map = model.list_filter_map[ filter_name ]
+        for parameter_name in parameter_map:
+          parameter = parameter_map[ parameter_name ]
+          if parameter.type == 'Model' and hasattr( parameter, 'model_resolve' ):
+            new_model = parameter.model_resolve( parameter.model )  # this is django specific again
+            del parameter.model_resolve
             if not isinstance( new_model, Model ):
-              raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
+              raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, parameter.model ) )
 
-            paramater.model = new_model
+            parameter.model = new_model
 
-      # for paramater_name in model.list_query_map:
-      #   paramater = model.list_query_map[ paramater_name ]
-      #   if paramater.type == 'Model' and hasattr( paramater, 'model_resolve' ):
-      #     new_model = paramater.model_resolve( paramater.model )  # this is django specific again
-      #     del paramater.model_resolve
+      # for parameter_name in model.list_query_map:
+      #   parameter = model.list_query_map[ parameter_name ]
+      #   if parameter.type == 'Model' and hasattr( parameter, 'model_resolve' ):
+      #     new_model = parameter.model_resolve( parameter.model )  # this is django specific again
+      #     del parameter.model_resolve
       #     if not isinstance( new_model, Model ):
       #       raise ValueError( 'Late Resolved Model is not a Model: "{0}" from "{1}"'.format( new_model, field.model ) )
       #
-      #     paramater.model = new_model
+      #     parameter.model = new_model
 
   def _validateNamespace( self, namespace ):
     for name in namespace.element_map:
@@ -1205,13 +1245,14 @@ class Server():
           break
 
     except Exception as e:
+      id = uuid.uuid4().hex
       if self.debug_dump_location is not None:
-        _debugDump( self.debug_dump_location, request, e )
+        _debugDump( self.debug_dump_location, request, e, id, self.auth_header_list, self.auth_cookie_list )
 
       if self.debug:
-        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, e ), 'trace': traceback.format_exc() } )
+        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}". Reference Id: {2}'.format( type( e ).__name__, e, id ), 'trace': traceback.format_exc() } )
       else:
-        response = Response( 500, data={ 'message': 'Path Handler Exception ({0})"{1}"'.format( type( e ).__name__, e ) } )
+        response = Response( 500, data={ 'message': 'Path Handler Exception. Reference Id: {0}'.format( id ) } )
 
     if response is None:
       try:
@@ -1230,17 +1271,21 @@ class Server():
         response = Response( 403, data={ 'message': 'Not Authorized' } )
 
       except Exception as e:
+        id = uuid.uuid4().hex
         if self.debug_dump_location is not None:
-          _debugDump( self.debug_dump_location, request, e )
+          _debugDump( self.debug_dump_location, request, e, id, self.auth_header_list, self.auth_cookie_list )
 
         if self.debug:
-          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, e ), 'trace': traceback.format_exc() } )
+          response = Response( 500, data={ 'message': 'Exception ({0})"{1}". Reference Id: {2}'.format( type( e ).__name__, e, id ), 'trace': traceback.format_exc() } )
         else:
-          response = Response( 500, data={ 'message': 'Exception ({0})"{1}"'.format( type( e ).__name__, e ) } )
+          response = Response( 500, data={ 'message': 'Exception. Reference Id: {0}'.format( id ) } )
 
     else:
       if not isinstance( response, Response ):
-        response = Response( 500, data={ 'message': 'Path Handler Return an Invalid Response: ({0})"{1}"'.format( type( response ).__name__, response ) } )
+        if self.debug:
+          response = Response( 500, data={ 'message': 'Path Handler Return an Invalid Response: ({0})"{1}"'.format( type( response ).__name__, response ) } )
+        else:
+          response = Response( 500, data={ 'message': 'Path Handler Return an Invalid Response' } )
 
     response.header_map[ 'Cinp-Version' ] = __CINP_VERSION__
     if self.cors_allow_origin is not None:
@@ -1267,7 +1312,10 @@ class Server():
     if element is None:
       return Response( 404, data={ 'message': 'path not found "{0}"'.format( request.uri ) } )
     if not isinstance( element, Element ):
-      return Response( 500, data={ 'message': 'confused, path ("{0}") yeilded non element "{1}"'.format( request.uri, element ) } )
+      if self.debug:
+        return Response( 500, data={ 'message': 'confused, path ("{0}") yielded non-element "{1}"'.format( request.uri, element ) } )
+      else:
+        return Response( 500, data={ 'message': 'confused, path yielded non-element' } )
 
     if request.verb == 'OPTIONS':  # options never need auth, nor is the Cinp-Version header required, we can take care of it early
       response = element.options()
@@ -1322,6 +1370,7 @@ class Server():
     if user is None:
       return Response( 401, data={ 'message': 'Invalid Session' } )
 
+    # we don't check auth for superuser's, same as root... becarefull who you give superuser to
     if not user.is_superuser:
       if not element.checkAuth( user, request.verb, id_list ):
         raise NotAuthorized()
@@ -1363,7 +1412,7 @@ class Server():
       elif request.verb == 'UPDATE':
         result = element.update( converter, transaction, id_list, request.data, multi )
 
-      if request.verb == 'DELETE':
+      elif request.verb == 'DELETE':
         result = element.delete( transaction, id_list )
 
       elif request.verb == 'CALL':
@@ -1373,15 +1422,19 @@ class Server():
       if in_transaction:
         try:
           transaction.abort()
-        except Exception:  # TODO: put some logging in here, this should be a warning log
-          pass
+        except Exception as inner_e:
+          if self.debug_dump_location is not None:  # else we don't have any where to say this, hopefully it wasn't to bad
+            writer = _getDebugWriter( self.debug_dump_location )
+            if writer is not None:
+              with writer as fp:
+                fp.write( 'Problem aborting the transaction: {0}'.format( inner_e ) )
 
       raise e
 
     if result is None:
       if in_transaction:
         transaction.abort()
-      return Response( 500, 'Confused, verb "{0}"'.format( request.verb ) )
+      return Response( 500, data={ 'message': 'Confused, verb "{0}"'.format( request.verb ) } )
 
     if in_transaction:
       transaction.commit()
@@ -1410,30 +1463,31 @@ class Request():
   def __init__( self, verb, uri, header_map, cookie_map ):
     super().__init__()
     self.verb = verb
-    self.uri = uri  # make sure the query string/fragment/etc has allreay been stripped by the Child Class
+    self.uri = uri  # make sure the query string/fragment/etc has already been stripped by the Child Class
     self.header_map = header_map
     self.cookie_map = cookie_map
     self.data = None
 
-  def fromText( self, buff ):
-    self.data = buff
+  def fromText( self, stream ):
+    self.data = str( stream.readall(), 'utf-8' )
 
-  def fromJSON( self, buff ):
-    buff = buff.strip()
-    if not buff:
+  def fromJSON( self, stream ):
+    try:
+      self.data = json.load( stream )
+    except json.JSONDecodeError as e:
       self.data = None
-    else:
-      try:
-        self.data = json.loads( buff )
-      except ValueError as e:
-        self.data = None
-        raise InvalidRequest( 'Error Parsing JSON Request data: "{0}"'.format( e ) )
+      if e.doc == '':
+        return
+      raise InvalidRequest( 'Error Parsing JSON Request data: "{0}"'.format( e ) )
+    except ValueError as e:
+      self.data = None
+      raise InvalidRequest( 'Error Parsing JSON Request data: "{0}"'.format( e ) )
 
-  def fromXML( self, buff ):
+  def fromXML( self, stream ):
     pass
 
-  def fromURLEncodedForm( self, buff ):
-    self.data = parse.parse_qs( buff )
+  def fromURLEncodedForm( self, stream ):
+    self.data = parse.parse_qs( str( stream.readall(), 'utf-8' ) )
 
   def __str__( self ):
     return 'Request:\n  Verb: "{0}"\n  URI: "{1}"\n  Header Map: "{2}"\n  Data: "{3}"'.format( self.verb, self.uri, self.header_map, self.data )

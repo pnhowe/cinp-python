@@ -23,10 +23,10 @@ this should create a .deb file in the parent directory.
 
 
 
-File Paramaters/Fields
+File Parameters/Fields
 ----------------------
 
-The core toPython returns File Paramaters/Fields as a tuple, the first part being
+The core toPython returns File Parameters/Fields as a tuple, the first part being
 a readable file handle, the second being the filename the client specified when
 uploading the file, or None if it was not specified.  This file handle, depending
 on how it was refrenced may be a in memory buffer, a http request, or a file on disk.
@@ -39,7 +39,7 @@ The Filename is specified by the client, and is in no way reliable for much more
 some metadata info.
 
 For the Django ORM, the toPython function wraps the value in a Django File
-(django.core.files.File) Object.  For Paramaters, this File object is pointing at
+(django.core.files.File) Object.  For Parameters, this File object is pointing at
 the file handle as from above. For Fields, the storage class that the django field
 is using, is used to save the file and return the Field object which is then set
 as the value of the field.

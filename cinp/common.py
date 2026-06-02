@@ -72,7 +72,7 @@ class URI():
   def extractIds( self, uri_list ):  # TODO: should we make sure the namespace/model do not change in the list?
     """
     extract the record IDs from the URI's in uri_list, can handle some/all/none
-    of the URIs having multiple IDs in them allready, does not force uniqunes
+    of the URIs having multiple IDs in them already, does not force uniqunes
     order should remain intact
     """
     if isinstance( uri_list, str ):
@@ -111,7 +111,7 @@ class URI():
     return self.build( namespace_list, model, action, id_list, True )
 
 
-# barrowed from https://www.python.org/dev/peps/pep-0257/
+# borrowed from https://www.python.org/dev/peps/pep-0257/
 def doccstring_prep( docstring ):
   if not docstring:
     return ''

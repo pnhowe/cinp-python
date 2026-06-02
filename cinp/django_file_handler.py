@@ -2,7 +2,7 @@ import os
 import tempfile
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from cinp.server_common import Response, InvalidRequest
 from cinp.readers import READER_REGISTRY
@@ -10,15 +10,20 @@ from cinp.readers import READER_REGISTRY
 FILE_STORAGE = '/tmp/django_file_handler/'
 FILE_TTL = timedelta( hours=2 )
 CHUNK_SIZE = 4096 * 1024
-INLINE_CONTENT_DISPOSITION = re.compile( r'^inline: filename="([a-zA-Z0-9_\-\. ]+)"$' )
+INLINE_CONTENT_DISPOSITION = re.compile( r'^inline; filename="([a-zA-Z0-9_\-\. ]+)"$' )
 
 
 def cleaner():  # .meta files are created at the same time, so they should clean up at the same time
-  cutoff = datetime.now() - FILE_TTL
+  cutoff = datetime.now( timezone.utc ) - FILE_TTL
   for filename in os.listdir( FILE_STORAGE ):
+    if not filename.endswith( '.meta' ):
+      continue
+
     filepath = os.path.join( FILE_STORAGE, filename )
-    if datetime.fromtimestamp( os.path.getctime( filepath ) ) < cutoff:
+    if datetime.fromtimestamp( os.path.getctime( filepath ), timezone.utc ) < cutoff:
+      filepath = filepath[ :-5 ]
       print( 'removing "{0}"'.format( filepath ) )
+      os.unlink( '{0}.meta'.format( filepath ) )
       os.unlink( filepath )
 
 
@@ -44,14 +49,14 @@ def _localFileReader( refname ):
     raise ValueError( 'Invalid refname' )
 
 
-def _localFileWriter( origional_filename ):
+def _localFileWriter( original_filename ):
   if not os.path.exists( FILE_STORAGE ):
-    os.makedirs( FILE_STORAGE )
+    os.makedirs( FILE_STORAGE, mode=0o700 )
 
   writer = tempfile.NamedTemporaryFile( mode='wb', prefix='', dir=FILE_STORAGE, delete=False )
   filename = writer.name
 
-  open( '{0}.meta'.format( filename ), 'w' ).write( json.dumps( { 'filename': origional_filename } ) )
+  open( '{0}.meta'.format( filename ), 'w' ).write( json.dumps( { 'filename': original_filename } ) )
 
   return ( writer, os.path.basename( filename ) )
 
@@ -70,7 +75,7 @@ def upload_view( django_request ):
   pass
 
 
-# for gnuicorn apps
+# for gunicorn apps
 def upload_handler( request ):  # TODO: also support multi-part
   if request.verb == 'OPTIONS':
     header_map = {}
@@ -92,7 +97,7 @@ def upload_handler( request ):  # TODO: also support multi-part
     match = INLINE_CONTENT_DISPOSITION.match( content_disposition )
     if not match:
       return InvalidRequest( message='Invalid Content-Disposition' ).asResponse()
-    filename = match.groups( 1 )[0]
+    filename = match.groups()[0]
   else:
     filename = None
 

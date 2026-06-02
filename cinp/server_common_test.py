@@ -1,7 +1,8 @@
 import pytest
+from io import StringIO
 
 from cinp.common import URI
-from cinp.server_common import __CINP_VERSION__, FILTER_OPERATION_LIST, Converter, Paramater, Field, FilterParamater, Namespace, Model, Action, Request, Response, Server, InvalidRequest, ServerError, ObjectNotFound, AnonymousUser
+from cinp.server_common import __CINP_VERSION__, FILTER_OPERATION_LIST, Converter, Parameter, Field, FilterParameter, Namespace, Model, Action, Request, Response, Server, InvalidRequest, ServerError, ObjectNotFound, AnonymousUser
 
 # TODO: test CORS header stuff
 
@@ -69,7 +70,7 @@ class TestTransaction():
       raise ValueError( 'bad stuff' )
 
     elif filter_name == '_query_':
-      return( [ filter_values[ 'filter' ], filter_values[ 'sort' ] ], position, count )
+      return ( [ filter_values[ 'filter' ], filter_values[ 'sort' ] ], position, count )
 
     return None  # just to be explicit, None is the return value if you do not return anything
 
@@ -279,15 +280,15 @@ def test_model():
   assert model2.options().data is None
 
   list_filter_map = {}
-  list_filter_map[ 'stuff' ] = { 'loads': Paramater( name='loads', type='String', length=10 ) }
+  list_filter_map[ 'stuff' ] = { 'loads': Parameter( name='loads', type='String', length=10 ) }
   list_query_filter_map = {}
-  list_query_filter_map = { 'of': FilterParamater( name='of', type='String', length=10 ), 'other': FilterParamater( name='other', type='Integer', allowed_operations=( '=', '!=' ) ) }
+  list_query_filter_map = { 'of': FilterParameter( name='of', type='String', length=10 ), 'other': FilterParameter( name='other', type='Integer', allowed_operations=( '=', '<' ) ) }
   model3 = Model( name='model3', transaction_class=TestTransaction, field_list=[], list_filter_map=list_filter_map, list_query_filter_map=list_query_filter_map, list_query_sort_list=[ 'orderd' ] )
   ns.addElement( model3 )
   assert sort_dsc( ns.describe( ns.converter ).data ) == { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [], 'models': [ '/api/model1', '/api/model2', '/api/model3' ], 'multi-uri-max': 100 }
   assert sort_dsc( model1.describe( model1.parent.converter ).data ) == { 'name': 'model1', 'path': '/api/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [], 'query-filter-fields': [], 'query-sort-fields': [] }
   assert sort_dsc( model2.describe( model2.parent.converter ).data ) == { 'name': 'model2', 'path': '/api/model2', 'fields': [ { 'type': 'String', 'length': 50, 'name': 'field1', 'mode': 'RW', 'required': True }, { 'type': 'Integer', 'name': 'field2', 'mode': 'RO', 'required': True } ], 'actions': [], 'constants': {}, 'id-field-name': 'field2', 'list-filters': {}, 'not-allowed-verbs': [], 'query-filter-fields': [], 'query-sort-fields': [] }
-  assert sort_dsc( model3.describe( model1.parent.converter ).data ) == { 'name': 'model3', 'path': '/api/model3', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {'stuff': [{'length': 10, 'name': 'loads', 'type': 'String'}]}, 'not-allowed-verbs': [], 'query-filter-fields': [ { 'length': 10, 'name': 'of', 'type': 'String', 'allowed_operations': FILTER_OPERATION_LIST }, { 'name': 'other', 'type': 'Integer', 'allowed_operations': ( '=', '!=' ) } ], 'query-sort-fields': [ 'orderd' ] }
+  assert sort_dsc( model3.describe( model1.parent.converter ).data ) == { 'name': 'model3', 'path': '/api/model3', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {'stuff': [{'length': 10, 'name': 'loads', 'type': 'String'}]}, 'not-allowed-verbs': [], 'query-filter-fields': [ { 'length': 10, 'name': 'of', 'type': 'String', 'allowed_operations': FILTER_OPERATION_LIST }, { 'name': 'other', 'type': 'Integer', 'allowed_operations': ( '=', '<' ) } ], 'query-sort-fields': [ 'orderd' ] }
 
 
 def test_action():
@@ -295,17 +296,17 @@ def test_action():
   model = Model( name='model1', transaction_class=TestTransaction, field_list=[] )
   ns.addElement( model )
 
-  action1 = Action( name='act1', return_paramater=Paramater( type='String' ), func=fake_func )
-  assert sort_dsc( action1.describe( ns.converter ).data ) == { 'name': 'act1', 'return-type': { 'type': 'String' }, 'paramaters': [], 'static': True, 'path': None }
+  action1 = Action( name='act1', return_parameter=Parameter( type='String' ), func=fake_func )
+  assert sort_dsc( action1.describe( ns.converter ).data ) == { 'name': 'act1', 'return-type': { 'type': 'String' }, 'parameters': [], 'static': True, 'path': None }
   model.addAction( action1 )
-  assert sort_dsc( action1.describe( action1.parent.parent.converter ).data ) == { 'name': 'act1', 'return-type': { 'type': 'String' }, 'paramaters': [], 'static': True, 'path': '/api/model1(act1)' }
+  assert sort_dsc( action1.describe( action1.parent.parent.converter ).data ) == { 'name': 'act1', 'return-type': { 'type': 'String' }, 'parameters': [], 'static': True, 'path': '/api/model1(act1)' }
 
-  action2 = Action( name='act2', return_paramater=Paramater( type='Integer' ), static=False, func=fake_func )
-  assert sort_dsc( action2.describe( ns.converter ).data ) == { 'name': 'act2', 'return-type': { 'type': 'Integer' }, 'paramaters': [], 'static': False, 'path': None }
+  action2 = Action( name='act2', return_parameter=Parameter( type='Integer' ), static=False, func=fake_func )
+  assert sort_dsc( action2.describe( ns.converter ).data ) == { 'name': 'act2', 'return-type': { 'type': 'Integer' }, 'parameters': [], 'static': False, 'path': None }
 
-  action3 = Action( name='act3', return_paramater=Paramater( type='Boolean' ), paramater_list=[ Paramater( name='bob', type='Float' ) ], static=False, func=fake_func )
+  action3 = Action( name='act3', return_parameter=Parameter( type='Boolean' ), parameter_list=[ Parameter( name='bob', type='Float' ) ], static=False, func=fake_func )
   model.addAction( action3 )
-  assert sort_dsc( action3.describe( action3.parent.parent.converter ).data ) == { 'name': 'act3', 'return-type': { 'type': 'Boolean' }, 'paramaters': [ { 'name': 'bob', 'type': 'Float' } ], 'static': False, 'path': '/api/model1(act3)' }
+  assert sort_dsc( action3.describe( action3.parent.parent.converter ).data ) == { 'name': 'act3', 'return-type': { 'type': 'Boolean' }, 'parameters': [ { 'name': 'bob', 'type': 'Float' } ], 'static': False, 'path': '/api/model1(act3)' }
 
   assert action3.describe( action3.parent.parent.converter ).header_map == { 'Cache-Control': 'max-age=0', 'Verb': 'DESCRIBE', 'Type': 'Action' }
 
@@ -321,14 +322,14 @@ def test_call():
   model = Model( name='model1', transaction_class=TestTransaction, field_list=field_list )
   transaction = model.transaction_class()
 
-  action1 = Action( name='act1', return_paramater=Paramater( type='String' ), func=lambda: 'hello' )
+  action1 = Action( name='act1', return_parameter=Parameter( type='String' ), func=lambda: 'hello' )
   resp = action1.call( converter, transaction, None, {}, None, False )
   assert resp.http_code == 200
   assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'CALL', 'Multi-Object': 'False' }
   assert resp.data == 'hello'
 
-  action2 = Action( name='act2', return_paramater=Paramater( type='String' ), paramater_list=[ Paramater( name='p1', type='String', default='alice' ) ], func=lambda p1: 'hello "{0}"'.format( p1 ) )
-  # with pytest.raises( InvalidRequest ):  # should we be ignorning data?
+  action2 = Action( name='act2', return_parameter=Parameter( type='String' ), parameter_list=[ Parameter( name='p1', type='String', default='alice' ) ], func=lambda p1: 'hello "{0}"'.format( p1 ) )
+  # with pytest.raises( InvalidRequest ):  # should we be ignoring data?
   #  resp = action2.call( converter, transaction, None, { 'p1': 'bob', 'nope': 'sue' }, None, False )
 
   resp = action2.call( converter, transaction, None, {}, None, False )
@@ -341,7 +342,7 @@ def test_call():
   assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'CALL', 'Multi-Object': 'False' }
   assert resp.data == 'hello "bob"'
 
-  action3 = Action( name='act3', return_paramater=Paramater( type='String' ), func=lambda a: 'hello "{0}"'.format( a ), static=False )
+  action3 = Action( name='act3', return_parameter=Parameter( type='String' ), func=lambda a: 'hello "{0}"'.format( a ), static=False )
   model.addAction( action3 )
   with pytest.raises( InvalidRequest ):
     action3.call( converter, transaction, None, { 'a': 'bob' }, None, False )
@@ -360,7 +361,7 @@ def test_call():
   assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'CALL', 'Multi-Object': 'False' }
   assert resp.data is None
 
-  action9 = Action( name='act9', return_paramater=Paramater( type='String' ), paramater_list=[ Paramater( name='p1', type='String' ), Paramater( name='p2', type='_USER_' ) ], func=lambda p1, p2: '{0}: {1}'.format( p1, p2 ) )
+  action9 = Action( name='act9', return_parameter=Parameter( type='String' ), parameter_list=[ Parameter( name='p1', type='String' ), Parameter( name='p2', type='_USER_' ) ], func=lambda p1, p2: '{0}: {1}'.format( p1, p2 ) )
   resp = action9.call( converter, transaction, None, { 'p1': 'stuff' }, 'Me The User', False )
   assert resp.http_code == 200
   assert resp.header_map == { 'Cache-Control': 'no-cache', 'Verb': 'CALL', 'Multi-Object': 'False' }
@@ -410,7 +411,7 @@ def test_list():
   converter = Converter( None )
   field_list = []
   list_filter_map = {}
-  list_filter_map[ 'lots' ] = { 'more': Paramater( name='more', type='String', length=10 ) }
+  list_filter_map[ 'lots' ] = { 'more': Parameter( name='more', type='String', length=10 ) }
   list_filter_map[ 'bad' ] = {}
   model = Model( name='model1', field_list=field_list, list_filter_map=list_filter_map, transaction_class=TestTransaction )
   transaction = model.transaction_class()
@@ -442,7 +443,7 @@ def test_list_query():
   converter = Converter( None )
   field_list = []
   list_query_filter_map = {}
-  list_query_filter_map = { 'myfield': FilterParamater( name='myfield', type='String', length=10 ), 'myfield2': FilterParamater( name='myfield', type='String', length=10, allowed_operations=( '=', '!=', '>' ) ) }
+  list_query_filter_map = { 'myfield': FilterParameter( name='myfield', type='String', length=10 ), 'myfield2': FilterParameter( name='myfield', type='String', length=10, allowed_operations=( '=', '<', '>' ) ) }
   model = Model( name='model1', field_list=field_list, list_query_filter_map=list_query_filter_map, list_query_sort_list=[ 'orderable' ], transaction_class=TestTransaction )
   transaction = model.transaction_class()
 
@@ -610,8 +611,8 @@ def test_getElement():
   mdl2 = Model( name='mdl2', field_list={}, transaction_class=TestTransaction )
   root_ns.addElement( mdl1 )
   ns2_2.addElement( mdl2 )
-  act1 = Action( name='act1', return_paramater=Paramater( type='String' ), paramater_list=[ Paramater( name='bob', type='Float' ) ], static=False, func=fake_func )
-  act2 = Action( name='act2', return_paramater=Paramater( type='String' ), paramater_list=[ Paramater( name='stuff', type='Boolean' ) ], func=fake_func )
+  act1 = Action( name='act1', return_parameter=Parameter( type='String' ), parameter_list=[ Parameter( name='bob', type='Float' ) ], static=False, func=fake_func )
+  act2 = Action( name='act2', return_parameter=Parameter( type='String' ), parameter_list=[ Parameter( name='stuff', type='Boolean' ) ], func=fake_func )
   mdl1.addAction( act1 )
   mdl2.addAction( act2 )
 
@@ -641,22 +642,22 @@ def test_getElement():
 
 
 def test_request():
-  req = Request( 'DESCRIBE', '/api/v1/ns/model', { 'CINP-VERSION': '1.0', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50, 'MULTI-OBJECT': 'True', 'ID-ONLY': 'True' }, { 'Flavor': 'Yumm' } )
+  req = Request( 'DESCRIBE', '/api/v1/ns/model', { 'CINP-VERSION': '2.0', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50, 'MULTI-OBJECT': 'True', 'ID-ONLY': 'True' }, { 'Flavor': 'Yumm' } )
   assert req.verb == 'DESCRIBE'
   assert req.uri == '/api/v1/ns/model'
-  assert req.header_map == { 'CINP-VERSION': '1.0', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50, 'MULTI-OBJECT': 'True', 'ID-ONLY': 'True' }
+  assert req.header_map == { 'CINP-VERSION': '2.0', 'CONTENT-TYPE': 'text/plain', 'FILTER': 'stuff', 'POSITION': 0, 'COUNT': 50, 'MULTI-OBJECT': 'True', 'ID-ONLY': 'True' }
   assert req.cookie_map == { 'Flavor': 'Yumm' }
 
-  req.fromJSON( '"My Text"' )
+  req.fromJSON( StringIO( '"My Text"' ) )
   assert req.data == 'My Text'
 
-  req.fromJSON( '{ "key": "value" }' )
+  req.fromJSON( StringIO( '{ "key": "value" }' ) )
   assert req.data == { 'key': 'value' }
 
-  req.fromJSON( '' )
+  req.fromJSON( StringIO( '' ) )
   assert req.data is None
 
-  req.fromJSON( '[ 1 ,2 ,3 ]' )
+  req.fromJSON( StringIO( '[ 1 ,2 ,3 ]' ) )
   assert req.data == [ 1, 2, 3 ]
 
 
@@ -680,28 +681,28 @@ def test_response():
   assert resp.asJSON() is None  # yea, still none, base Responose dosen't asXXXX anything
 
 
-def test_saninity_checks():
+def test_sanity_checks():
   server = Server( root_path='/api/', root_version='0.0' )
   ns = Namespace( name='ns', version='0.1', converter=None )
   model = Model( name='model', field_list=[], transaction_class=TestTransaction )
   ns.addElement( model )
-  action = Action( name='action', return_paramater=Paramater( type='String' ), func=fake_func )
+  action = Action( name='action', return_parameter=Parameter( type='String' ), func=fake_func )
   model.addAction( action )
   server.registerNamespace( '/', ns )
 
-  res = server.dispatch( Request( 'BOB', '/api/', { 'CINP-VERSION': '1.0' }, {} ) )
+  res = server.dispatch( Request( 'BOB', '/api/', { 'CINP-VERSION': '2.0' }, {} ) )
   assert res.http_code == 400
   assert res.data == { 'message': 'Invalid Verb (HTTP Method) "BOB"' }
 
-  res = server.dispatch( Request( 'DESCRIBE', 'invalid', { 'CINP-VERSION': '1.0' }, {} ) )
+  res = server.dispatch( Request( 'DESCRIBE', 'invalid', { 'CINP-VERSION': '2.0' }, {} ) )
   assert res.http_code == 400
   assert res.data == { 'message': 'Unable to Parse "invalid"' }
 
-  res = server.dispatch( Request( 'DESCRIBE', '/api/ns/model:' + ':'.join( 'id' * 101 ) + ':', { 'CINP-VERSION': '1.0' }, {} ) )
+  res = server.dispatch( Request( 'DESCRIBE', '/api/ns/model:' + ':'.join( 'id' * 101 ) + ':', { 'CINP-VERSION': '2.0' }, {} ) )
   assert res.http_code == 400
   assert res.data == { 'message': 'id_list longer than supported length of "100"' }
 
-  res = server.dispatch( Request( 'DESCRIBE', '/api/nope', { 'CINP-VERSION': '1.0' }, {} ) )
+  res = server.dispatch( Request( 'DESCRIBE', '/api/nope', { 'CINP-VERSION': '2.0' }, {} ) )
   assert res.http_code == 404
   assert res.data == { 'message': 'path not found "/api/nope"' }
 
@@ -713,60 +714,60 @@ def test_saninity_checks():
   assert res.http_code == 400
   assert res.data == { 'message': 'Invalid CInP Protocol Version' }
 
-  with pytest.raises( ValueError ):  # checkAuth not implemented, for this round of tests we call good
-    server.dispatch( Request( 'DESCRIBE', '/api/ns/model(action)', { 'CINP-VERSION': '1.0' }, {} ) )
+  with pytest.raises( NotImplementedError ):  # checkAuth not implemented, for this round of tests we call good
+    server.dispatch( Request( 'DESCRIBE', '/api/ns/model(action)', { 'CINP-VERSION': '2.0' }, {} ) )
 
   for verb in ( 'GET', 'LIST', 'CREATE', 'UPDATE', 'DELETE' ):
-    res = server.dispatch( Request( verb, '/api/ns/model(action)', { 'CINP-VERSION': '1.0' }, {} ) )
+    res = server.dispatch( Request( verb, '/api/ns/model(action)', { 'CINP-VERSION': '2.0' }, {} ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Invalid verb "{0}" for request with action'.format( verb ) }
 
   for verb in ( 'GET', 'LIST', 'CREATE', 'UPDATE', 'DELETE' ):
-    res = server.dispatch( Request( verb, '/api/ns/model:id:(action)', { 'CINP-VERSION': '1.0' }, {} ) )
+    res = server.dispatch( Request( verb, '/api/ns/model:id:(action)', { 'CINP-VERSION': '2.0' }, {} ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Invalid verb "{0}" for request with action'.format( verb ) }
 
   for uri in ( '/api/', '/api/ns/', '/api/ns/model', '/api/ns/model:id:' ):
-    res = server.dispatch( Request( 'CALL', uri, { 'CINP-VERSION': '1.0' }, {} ) )
+    res = server.dispatch( Request( 'CALL', uri, { 'CINP-VERSION': '2.0' }, {} ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Verb "CALL" requires action' }
 
   for verb in ( 'LIST', 'CREATE', 'DESCRIBE' ):
-    res = server.dispatch( Request( verb, '/api/ns/model:id:', { 'CINP-VERSION': '1.0' }, {} ) )
+    res = server.dispatch( Request( verb, '/api/ns/model:id:', { 'CINP-VERSION': '2.0' }, {} ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Invalid Verb "{0}" for request with id'.format( verb ) }
 
   for verb in ( 'GET', 'UPDATE', 'DELETE' ):
-    res = server.dispatch( Request( verb, '/api/ns/model', { 'CINP-VERSION': '1.0' }, {} ) )
+    res = server.dispatch( Request( verb, '/api/ns/model', { 'CINP-VERSION': '2.0' }, {} ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Verb "{0}" requires id'.format( verb ) }
 
   for verb in ( 'GET', 'DELETE' ):
-    req = Request( verb, '/api/ns/model:d:', { 'CINP-VERSION': '1.0' }, {} )
+    req = Request( verb, '/api/ns/model:d:', { 'CINP-VERSION': '2.0' }, {} )
     req.data = { 'some': 'data' }
     res = server.dispatch( req )
     assert res.http_code == 400
     assert res.data == { 'message': 'Invalid verb "{0}" for request with data'.format( verb ) }
 
   for verb in ( 'DESCRIBE', ):
-    req = Request( verb, '/api/ns/model', { 'CINP-VERSION': '1.0' }, {} )
+    req = Request( verb, '/api/ns/model', { 'CINP-VERSION': '2.0' }, {} )
     req.data = { 'some': 'data' }
     res = server.dispatch( req )
     assert res.http_code == 400
     assert res.data == { 'message': 'Invalid verb "{0}" for request with data'.format( verb ) }
 
   for verb in ( 'UPDATE', ):
-    res = server.dispatch( Request( verb, '/api/ns/model:id:', { 'CINP-VERSION': '1.0' }, {} ) )
+    res = server.dispatch( Request( verb, '/api/ns/model:id:', { 'CINP-VERSION': '2.0' }, {} ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Verb "{0}" requires data'.format( verb ) }
 
   for verb in ( 'CREATE', ):
-    res = server.dispatch( Request( verb, '/api/ns/model', { 'CINP-VERSION': '1.0' }, {} ) )
+    res = server.dispatch( Request( verb, '/api/ns/model', { 'CINP-VERSION': '2.0' }, {} ) )
     assert res.http_code == 400
     assert res.data == { 'message': 'Verb "{0}" requires data'.format( verb ) }
 
   for verb in ( 'LIST', 'CREATE' ):  # also 'GET', 'UPDATE', 'DELETE' which also requires an Id which requires a model so already covered
-    req = Request( verb, '/api/ns/', { 'CINP-VERSION': '1.0' }, {} )
+    req = Request( verb, '/api/ns/', { 'CINP-VERSION': '2.0' }, {} )
     req.data = { 'some': 'data' }
     res = server.dispatch( req )
     assert res.http_code == 400
@@ -791,7 +792,7 @@ def test_server():
   req = Request( 'OPTIONS', '/api/', {}, {} )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Allow': 'OPTIONS, DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '1.0' }
+  assert res.header_map == { 'Allow': 'OPTIONS, DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '2.0' }
 
   path = '/api/'
   desc_ref = sort_dsc( { 'name': 'root', 'path': '/api/', 'api-version': '0.0', 'namespaces': [ '/api/ns1/', '/api/ns2/' ], 'models': [], 'multi-uri-max': 100 } )
@@ -800,7 +801,7 @@ def test_server():
   res = server.handle( req )
   assert res.http_code == 200
   assert sort_dsc( res.data ) == desc_ref
-  assert res.header_map == { 'Type': 'Namespace', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '1.0' }
+  assert res.header_map == { 'Type': 'Namespace', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '2.0' }
 
   path = '/api/ns1/'
   desc_ref = sort_dsc( { 'name': 'ns1', 'path': '/api/ns1/', 'api-version': '0.1', 'namespaces': [], 'models': [ '/api/ns1/model1', '/api/ns1/model2' ], 'multi-uri-max': 100 } )
@@ -809,7 +810,7 @@ def test_server():
   res = server.handle( req )
   assert res.http_code == 200
   assert sort_dsc( res.data ) == desc_ref
-  assert res.header_map == { 'Type': 'Namespace', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '1.0' }
+  assert res.header_map == { 'Type': 'Namespace', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '2.0' }
 
   path = '/api/ns1/model1'
   desc_ref = sort_dsc( { 'name': 'model1', 'path': '/api/ns1/model1', 'fields': [], 'actions': [], 'constants': {}, 'list-filters': {}, 'not-allowed-verbs': [], 'query-filter-fields': [], 'query-sort-fields': [] } )
@@ -818,7 +819,7 @@ def test_server():
   res = server.handle( req )
   assert res.http_code == 200
   assert sort_dsc( res.data ) == desc_ref
-  assert res.header_map == { 'Type': 'Model', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '1.0' }
+  assert res.header_map == { 'Type': 'Model', 'Verb': 'DESCRIBE', 'Cache-Control': 'max-age=0', 'Cinp-Version': '2.0' }
 
   # TODO: more more more
 
@@ -835,31 +836,31 @@ def test_multi():
   req = Request( 'GET', '/api/ns1/model1:abc:', { 'CINP-VERSION': __CINP_VERSION__ }, {} )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '1.0', 'Verb': 'GET', 'Multi-Object': 'False' }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '2.0', 'Verb': 'GET', 'Multi-Object': 'False' }
   assert res.data == { '_extra_': 'get "abc"' }
 
   req = Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__ }, {} )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '1.0', 'Verb': 'GET', 'Multi-Object': 'True' }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '2.0', 'Verb': 'GET', 'Multi-Object': 'True' }
   assert res.data == { '/api/ns1/model1:abc:': { '_extra_': 'get "abc"' }, '/api/ns1/model1:def:': { '_extra_': 'get "def"' } }
 
   req = Request( 'GET', '/api/ns1/model1:abc:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'true' }, {} )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '1.0', 'Verb': 'GET', 'Multi-Object': 'True' }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '2.0', 'Verb': 'GET', 'Multi-Object': 'True' }
   assert res.data == { '/api/ns1/model1:abc:': { '_extra_': 'get "abc"' } }
 
   req = Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'true' }, {} )
   res = server.handle( req )
   assert res.http_code == 200
-  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '1.0', 'Verb': 'GET', 'Multi-Object': 'True' }
+  assert res.header_map == { 'Cache-Control': 'no-cache', 'Cinp-Version': '2.0', 'Verb': 'GET', 'Multi-Object': 'True' }
   assert res.data == { '/api/ns1/model1:abc:': { '_extra_': 'get "abc"' }, '/api/ns1/model1:def:': { '_extra_': 'get "def"' } }
 
   req = Request( 'GET', '/api/ns1/model1:abc:def:', { 'CINP-VERSION': __CINP_VERSION__, 'MULTI-OBJECT': 'false' }, {} )
   res = server.handle( req )
   assert res.http_code == 400
-  assert res.header_map == { 'Cinp-Version': '1.0' }
+  assert res.header_map == { 'Cinp-Version': '2.0' }
   assert res.data == { 'message': 'requested non multi-object, however multiple ids where sent' }
 
 
@@ -873,8 +874,8 @@ def test_not_allowed_verbs():
   model2 = Model( name='model2', field_list=field_list, not_allowed_verb_list=[ 'GET', 'LIST', 'CALL', 'CREATE', 'UPDATE', 'DELETE', 'DESCRIBE' ], transaction_class=TestTransaction )
   model1.checkAuth = lambda user, verb, id_list: True
   model2.checkAuth = lambda user, verb, id_list: True
-  action1 = Action( name='act', return_paramater=Paramater( type='String' ), func=fake_func )
-  action2 = Action( name='act', return_paramater=Paramater( type='String' ), func=fake_func )
+  action1 = Action( name='act', return_parameter=Parameter( type='String' ), func=fake_func )
+  action2 = Action( name='act', return_parameter=Parameter( type='String' ), func=fake_func )
   action1.checkAuth = lambda user, verb, id_list: True
   action2.checkAuth = lambda user, verb, id_list: True
   model1.addAction( action1 )
@@ -967,7 +968,7 @@ def test_user():
   field_list = []
   model1 = Model( name='model1', field_list=field_list, transaction_class=TestTransaction )
   model1.checkAuth = checkAuth
-  action1 = Action( name='act', return_paramater=Paramater( type='String' ), func=fake_func )
+  action1 = Action( name='act', return_parameter=Parameter( type='String' ), func=fake_func )
   action1.checkAuth = checkAuth
   model1.addAction( action1 )
   ns1.addElement( model1 )
