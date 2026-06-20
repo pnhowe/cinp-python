@@ -11,7 +11,7 @@ from tempfile import NamedTemporaryFile
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '2.0.0'
+__CLIENT_VERSION__ = '2.1.0'
 __CINP_VERSION__ = '2.0'
 
 __all__ = [ 'Timeout', 'ResponseError', 'DetailedInvalidRequest',
@@ -184,7 +184,7 @@ class CInP():
     if verb in ( 'GET', 'LIST', 'UPDATE', 'CREATE', 'DELETE', 'CALL' ) and not model:
       raise InvalidRequest( 'Verb "{0}" requires model'.format( verb ) )
 
-  async def _request( self, verb, uri, data=None, header_map=None, timeout=30, retry_count=0 ):
+  async def _request( self, verb, uri, data=None, header_map=None, timeout=30, retry_count=0, return_raw_result=False ):
     if self.connection_pool is None:
       raise RuntimeError( 'Connection pool is not initialized, make sure to use "async with CInP(...) as client:"' )
 
@@ -201,14 +201,14 @@ class CInP():
           pass
 
       try:
-        return await self.__request( verb, uri, data, header_map, timeout )
+        return await self.__request( verb, uri, data, header_map, timeout, return_raw_result )
       except RetryableException as e:
         logging.debug( 'cinp: got exception "{0}", retrying...'.format( e ) )
         last_exception = e.exception
 
     raise last_exception
 
-  async def __request( self, verb, uri, data=None, header_map=None, timeout=30 ):
+  async def __request( self, verb, uri, data, header_map, timeout, return_raw_result ):
     logging.debug( 'cinp: making "{0}" request to "{1}"'.format( verb, uri ) )
     if header_map is None:
       header_map = {}
@@ -260,13 +260,16 @@ class CInP():
       if not buff:
         data = None
       else:
-        try:
-          data = json.loads( buff )
-        except ValueError:
-          data = None
-          if http_code not in ( 400, 500 ):  # these two codes can deal with non dict data
-            logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
-            raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
+        if return_raw_result:
+          data = buff
+        else:
+          try:
+            data = json.loads( buff )
+          except ValueError:
+            data = None
+            if http_code not in ( 400, 500 ):  # these two codes can deal with non dict data
+              logging.warning( 'cinp: Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
+              raise ResponseError( 'Unable to parse response "{0}"'.format( buff[ 0:200 ] ) )
 
       header_map = { k: v for k, v in _headerListToMap( resp.headers ).items() if k in ( 'Position', 'Count', 'Total', 'Type', 'Multi-Object', 'Object-Id', 'Verb' ) }
 
