@@ -1,6 +1,8 @@
 import re
 import random
 import django
+import inspect
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db import DatabaseError, models, transaction
 from django.db.models import Q
@@ -443,6 +445,8 @@ class DjangoCInP():
       else:
         static = False
 
+      is_async = inspect.iscoroutinefunction( func )
+
       parameter_type_list_ = parameter_type_list or []
       ( model_name, name ) = func.__qualname__.split( '.' )
       if model_name not in self.action_map:
@@ -474,7 +478,7 @@ class DjangoCInP():
       except AttributeError:
         doc = ''
 
-      self.action_map[ model_name ].append( Action( name=name, doc=doc, func=func, return_parameter=return_parameter, parameter_list=parameter_list, static=static ) )
+      self.action_map[ model_name ].append( Action( name=name, doc=doc, func=async_to_sync( func ) if is_async else func, return_parameter=return_parameter, parameter_list=parameter_list, static=static ) )
       return func
 
     return decorator
