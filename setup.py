@@ -30,14 +30,14 @@ the Business Logic and permissions to be fully encapsulated on the Server.""",
        author='Peter Howe',
        author_email='pnhowe@gmail.com',
        url='https://github.com/cinp/python',
-       python='~=3.6',
+       python_requires='~=3.8',
        license='Apache2',
        classifiers=[
            'Development Status :: 5 - Production/Stable',
            'Intended Audience :: Developers',
            'License :: OSI Approved :: Apache Software License',
            'Programming Language :: Python :: 3',
-           'Programming Language :: Python :: 3.6'
+           'Programming Language :: Python :: 3.8'
        ],
        packages=[ 'cinp' ],
        cmdclass={ 'build_py': build }

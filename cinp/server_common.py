@@ -6,7 +6,7 @@ import uuid
 from dateutil import parser as datetimeparser
 from urllib import parse
 
-from cinp.common import URI, doccstring_prep
+from cinp.common import URI, docstring_prep
 from cinp.readers import READER_REGISTRY
 
 __CINP_VERSION__ = '2.0'
@@ -411,7 +411,7 @@ class Parameter():
   def __init__( self, type, name=None, is_array=False, doc=None, length=None, model=None, model_resolve=None, choice_list=None, default=notset, allowed_scheme_list=None ):
     super().__init__()
     self.name = name
-    self.doc = doccstring_prep( doc )
+    self.doc = docstring_prep( doc )
     if type is None:
       self.type = None
 
@@ -515,7 +515,7 @@ class Element():
     super().__init__()
     self.parent = None
     self.name = name
-    self.doc = doccstring_prep( doc )
+    self.doc = docstring_prep( doc )
 
   @property
   def path( self ):

@@ -112,7 +112,7 @@ class URI():
 
 
 # borrowed from https://www.python.org/dev/peps/pep-0257/
-def doccstring_prep( docstring ):
+def docstring_prep( docstring ):
   if not docstring:
     return ''
 
