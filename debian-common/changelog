@@ -1,3 +1,11 @@
+cinp (2.1.1-1) DIST; urgency=medium
+
+  * minor security and usabliltiy fixes
+  * fixes for rawget
+  * support for async actions on django server projects
+
+ -- Peter Howe <pnhowe@gmail.com>  Mon, 22 Jun 2026 10:52:11 -0600
+
 cinp (2.0.0-1) DIST; urgency=medium
 
   * Loads of fixes that were found by Claude
