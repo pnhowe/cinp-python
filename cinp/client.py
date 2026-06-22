@@ -11,7 +11,7 @@ from tempfile import NamedTemporaryFile
 
 from cinp.common import URI
 
-__CLIENT_VERSION__ = '2.1.0'
+__CLIENT_VERSION__ = '2.1.1'
 __CINP_VERSION__ = '2.0'
 
 __all__ = [ 'Timeout', 'ResponseError', 'DetailedInvalidRequest',
@@ -101,7 +101,7 @@ class CInP():
     if retry_event is not None:
       self.retry_event = retry_event
     else:
-      self.retry_event = asyncio.Event()
+      self.retry_event = None
 
     if not host.startswith( ( 'http:', 'https:' ) ):
       raise ValueError( 'hostname must start with http(s):' )
@@ -115,10 +115,10 @@ class CInP():
 
     self.uri = URI( root_path )
 
+    self.ssl_context = ssl.create_default_context()
     if not verify_ssl:
-      self.ssl_context = ssl._create_unverified_context()
-    else:
-      self.ssl_context = ssl.create_default_context()
+      self.ssl_context.check_hostname = False
+      self.ssl_context.verify_mode = ssl.CERT_NONE
 
     self.connection_pool = None
 
@@ -132,6 +132,9 @@ class CInP():
     self.auth_header_list = []
 
   async def __aenter__( self ):
+    if self.retry_event is None:
+      self.retry_event = asyncio.Event()
+
     if self.proxy:  # not doing 'is not None', so empty strings don't try and proxy
       self.connection_pool = httpcore.AsyncHTTPProxy( proxy_url=self.proxy, ssl_context=self.ssl_context )
     else:
@@ -339,7 +342,10 @@ class CInP():
       logging.warning( 'cinp: Unexpected HTTP Code "{0}" for DESCRIBE'.format( http_code ) )
       raise ResponseError( 'Unexpected HTTP Code "{0}" for DESCRIBE'.format( http_code ) )
 
-    return data, header_map[ 'Type' ]
+    try:
+      return data, header_map[ 'Type' ]
+    except KeyError:
+      raise ResponseError( 'DESCRIBE Response did not specify the Type' )
 
   async def list( self, uri, filter_name=None, filter_value_map=None, position=0, count=10, timeout=30, retry_count=0 ):
     """
@@ -503,23 +509,19 @@ class CInP():
           tmp_id_list = []
         id_list = tmp_id_list
 
-    result_list = []
     pos = 0
 
     while pos < len( id_list ):
       tmp_data = await self.get( self.uri.build( namespace, model, None, id_list[ pos: pos + chunk_size ] ), force_multi_mode=True, retry_count=retry_count )
       pos += chunk_size
       for key in tmp_data:
-        result_list.append( ( key, tmp_data[ key ] ) )
-
-      while len( result_list ) > 0:
-        yield result_list.pop( 0 )
+        yield ( key, tmp_data[ key ] )
 
   async def getFilteredObjects( self, uri, filter_name=None, filter_value_map=None, list_chunk_size=100, get_chunk_size=10, timeout=30, retry_count=0 ):
     pos = 0
     total = 1
     while pos < total:
-      ( tmp_id_list, count_map ) = await self.list( uri, filter_name=filter_name, filter_value_map=filter_value_map, position=pos, count=list_chunk_size, retry_count=retry_count )
+      ( tmp_id_list, count_map ) = await self.list( uri, filter_name=filter_name, filter_value_map=filter_value_map, position=pos, count=list_chunk_size, timeout=timeout, retry_count=retry_count )
       id_list = self.uri.extractIds( tmp_id_list )
       pos = count_map[ 'position' ] + count_map[ 'count' ]
       total = count_map[ 'total' ]
@@ -531,7 +533,7 @@ class CInP():
     pos = 0
     total = 1
     while pos < total:
-      ( tmp_id_list, count_map ) = await self.list( uri, filter_name=filter_name, filter_value_map=filter_value_map, position=pos, count=list_chunk_size, retry_count=retry_count )
+      ( tmp_id_list, count_map ) = await self.list( uri, filter_name=filter_name, filter_value_map=filter_value_map, position=pos, count=list_chunk_size, timeout=timeout, retry_count=retry_count )
       id_list = self.uri.extractIds( tmp_id_list )
       pos = count_map[ 'position' ] + count_map[ 'count' ]
       total = count_map[ 'total' ]
@@ -650,21 +652,31 @@ class CInP():
     if isinstance( filepath, str ):
       if filename is None:
         filename = os.path.basename( filepath )
-
-      file_reader = _readerWrapper( open( filepath, 'rb' ), cb )
-
     else:
       if filename is None:
         filename = os.path.basename( filepath.name )
 
-      file_reader = _readerWrapper( filepath, cb )
+    if '"' in filename or ';' in filename:
+      raise InvalidRequest( 'filename contains invalid characters' )
 
-    header_map = {
-                   'Content-Disposition': 'inline; filename="{0}"'.format( filename ),
-                   'Content-Length': len( file_reader )
-                 }
+    opened_file = None
+    try:
+      if isinstance( filepath, str ):
+        opened_file = open( filepath, 'rb' )
+        file_reader = _readerWrapper( opened_file, cb )
+      else:
+        file_reader = _readerWrapper( filepath, cb )
 
-    ( http_code, data, _ ) = await self._request( 'UPLOAD', uri_parser.build( namespace, model ), data=file_reader, header_map=header_map, timeout=timeout )
+      header_map = {
+                     'Content-Disposition': 'inline; filename="{0}"'.format( filename ),
+                     'Content-Length': len( file_reader )
+                   }
+
+      ( http_code, data, _ ) = await self._request( 'UPLOAD', uri_parser.build( namespace, model ), data=file_reader, header_map=header_map, timeout=timeout )
+
+    finally:
+      if opened_file is not None:
+        opened_file.close()
 
     if http_code != 202:
       logging.warning( 'cinp: Unexpected HTTP Code "{0}" for File Upload'.format( http_code ) )

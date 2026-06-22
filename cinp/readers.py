@@ -64,3 +64,4 @@ def http( uri ):
 
 
 READER_REGISTRY[ 'http' ] = http
+READER_REGISTRY[ 'https' ] = http
